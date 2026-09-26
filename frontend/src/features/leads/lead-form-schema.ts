@@ -23,6 +23,8 @@ export const leadFormSchema = z.object({
     .trim()
     .refine((value) => value === "" || AMOUNT.test(value.replaceAll(",", "")), "Enter an amount such as 25000 or 25000.50"),
   notes: z.string().trim().max(5000, "Keep notes under 5,000 characters"),
+  /** "" means the signed-in user. */
+  ownerId: z.string(),
 });
 
 export type LeadFormValues = z.input<typeof leadFormSchema>;
@@ -36,6 +38,7 @@ export const emptyLeadForm: LeadFormValues = {
   source: "",
   estimatedValue: "",
   notes: "",
+  ownerId: "",
 };
 
 export function toCreateLeadInput(values: z.output<typeof leadFormSchema>): CreateLeadInput {
@@ -48,5 +51,6 @@ export function toCreateLeadInput(values: z.output<typeof leadFormSchema>): Crea
     source: values.source || undefined,
     estimatedValue: values.estimatedValue ? Number(values.estimatedValue.replaceAll(",", "")) : undefined,
     notes: values.notes || undefined,
+    ownerId: values.ownerId || undefined,
   };
 }

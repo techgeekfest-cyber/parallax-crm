@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/api/v1/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a user
+         * @description Admins and sales managers.
+         */
+        get: operations["get"];
+        /**
+         * Update a user
+         * @description Admins only. Changing role or deactivating ends the user's sessions.
+         */
+        put: operations["update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change your password
+         * @description Signs you out of every other session.
+         */
+        put: operations["changePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List users
+         * @description Admins and sales managers.
+         */
+        get: operations["list"];
+        put?: never;
+        /**
+         * Create a user
+         * @description Admins only. The initial password is shared out of band.
+         */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads": {
         parameters: {
             query?: never;
@@ -15,10 +83,30 @@ export interface paths {
          * List leads
          * @description Paginated, searchable list of active (non-archived) leads.
          */
-        get: operations["list"];
+        get: operations["list_1"];
         put?: never;
         /** Create a lead */
-        post: operations["create"];
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in
+         * @description Starts a server-side session (PARALLAX_SESSION cookie).
+         */
+        post: operations["login"];
         delete?: never;
         options?: never;
         head?: never;
@@ -33,7 +121,44 @@ export interface paths {
             cookie?: never;
         };
         /** Get a lead */
-        get: operations["get"];
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user and their permissions */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issue a CSRF token
+         * @description Sets the XSRF-TOKEN cookie. Send its value in the X-XSRF-TOKEN header on every write request.
+         */
+        get: operations["csrf"];
         put?: never;
         post?: never;
         delete?: never;
@@ -46,6 +171,45 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpdateUserRequest: {
+            firstName: string;
+            lastName: string;
+            /** @enum {string} */
+            role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        UserResponse: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            fullName: string;
+            /** @enum {string} */
+            role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+            active: boolean;
+            /** Format: date-time */
+            lastLoginAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ChangePasswordRequest: {
+            currentPassword: string;
+            newPassword: string;
+        };
+        CreateUserRequest: {
+            /** Format: email */
+            email: string;
+            firstName: string;
+            lastName: string;
+            /** @enum {string} */
+            role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+            password: string;
+        };
         CreateLeadRequest: {
             firstName: string;
             lastName: string;
@@ -57,6 +221,11 @@ export interface components {
             source?: "WEB" | "REFERRAL" | "EVENT" | "PARTNER" | "OUTBOUND" | "ADVERTISING" | "OTHER";
             estimatedValue?: number;
             notes?: string;
+            /**
+             * Format: uuid
+             * @description Owner; defaults to the signed-in user. Only managers and admins may assign to others.
+             */
+            ownerId?: string;
         };
         LeadResponse: {
             /** Format: uuid */
@@ -74,12 +243,50 @@ export interface components {
             source?: "WEB" | "REFERRAL" | "EVENT" | "PARTNER" | "OUTBOUND" | "ADVERTISING" | "OTHER";
             estimatedValue?: number;
             notes?: string;
+            owner?: components["schemas"]["OwnerResponse"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
             /** Format: int64 */
             version: number;
+        };
+        OwnerResponse: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            active: boolean;
+        };
+        LoginRequest: {
+            email: string;
+            password: string;
+        };
+        MeResponse: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            fullName: string;
+            /** @enum {string} */
+            role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+            permissions: components["schemas"]["PermissionsResponse"];
+        };
+        PermissionsResponse: {
+            manageUsers: boolean;
+            viewUsers: boolean;
+            accessAllSalesRecords: boolean;
+        };
+        PageResponseUserResponse: {
+            content: components["schemas"]["UserResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
         };
         LeadSummaryResponse: {
             /** Format: uuid */
@@ -93,6 +300,7 @@ export interface components {
             /** @enum {string} */
             source?: "WEB" | "REFERRAL" | "EVENT" | "PARTNER" | "OUTBOUND" | "ADVERTISING" | "OTHER";
             estimatedValue?: number;
+            owner?: components["schemas"]["OwnerResponse"];
             /** Format: date-time */
             createdAt: string;
         };
@@ -116,12 +324,135 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list: {
+        parameters: {
+            query?: {
+                q?: string;
+                role?: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+                active?: boolean;
+                page?: number;
+                size?: number;
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseUserResponse"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    list_1: {
         parameters: {
             query?: {
                 /** @description Matches name, company, email or lead number */
                 q?: string;
                 status?: ("NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED")[];
+                /** @description Only leads owned by this user. Reps may only pass their own id. */
+                ownerId?: string;
                 page?: number;
                 size?: number;
                 /** @description field[,asc|desc]; sortable: createdAt, updatedAt, lastName, company, status, estimatedValue, number */
@@ -144,7 +475,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    create_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -168,7 +499,31 @@ export interface operations {
             };
         };
     };
-    get: {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    get_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -187,6 +542,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LeadResponse"];
                 };
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    csrf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

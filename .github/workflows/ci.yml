@@ -69,6 +69,13 @@ jobs:
       DATABASE_USERNAME: parallax
       DATABASE_PASSWORD: parallax
       OPENAPI_ENABLED: "true"
+      # Plain http on localhost in CI; production keeps Secure cookies.
+      SESSION_COOKIE_SECURE: "false"
+      # The empty database gets exactly one user, the bootstrap admin, which the E2E setup signs in as.
+      ADMIN_BOOTSTRAP_EMAIL: admin@ci.parallax.test
+      ADMIN_BOOTSTRAP_PASSWORD: ci-bootstrap-admin-passphrase
+      E2E_ADMIN_EMAIL: admin@ci.parallax.test
+      E2E_ADMIN_PASSWORD: ci-bootstrap-admin-passphrase
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

@@ -5,6 +5,15 @@ spring:
     username: ${DATABASE_USERNAME:parallax}
     password: ${DATABASE_PASSWORD:parallax}
 
+parallax:
+  security:
+    # Plain-http localhost. Every other profile defaults to Secure cookies.
+    secure-cookies: ${SESSION_COOKIE_SECURE:false}
+  bootstrap:
+    # Local development only: a first admin for an empty local database. Never used in production.
+    admin-email: ${ADMIN_BOOTSTRAP_EMAIL:admin@parallax.local}
+    admin-password: ${ADMIN_BOOTSTRAP_PASSWORD:parallax-local-admin}
+
 management:
   endpoint:
     health:

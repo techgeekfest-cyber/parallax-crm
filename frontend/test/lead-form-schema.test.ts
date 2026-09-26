@@ -33,6 +33,11 @@ describe("leadFormSchema", () => {
 });
 
 describe("toCreateLeadInput", () => {
+  it("passes an explicit owner through", () => {
+    const input = toCreateLeadInput(leadFormSchema.parse({ ...valid, ownerId: "0190a1b2-0000-7000-8000-000000000001" }));
+    expect(input.ownerId).toBe("0190a1b2-0000-7000-8000-000000000001");
+  });
+
   it("omits empty optional fields and converts the amount to a number", () => {
     const input = toCreateLeadInput(leadFormSchema.parse({ ...valid, estimatedValue: "25,000.50", source: "EVENT" }));
     expect(input).toEqual({
@@ -44,6 +49,7 @@ describe("toCreateLeadInput", () => {
       source: "EVENT",
       estimatedValue: 25000.5,
       notes: undefined,
+      ownerId: undefined,
     });
   });
 });

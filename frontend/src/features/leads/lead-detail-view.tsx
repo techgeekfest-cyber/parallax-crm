@@ -4,6 +4,7 @@ import { ArrowLeftIcon, MailIcon, SearchXIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/states/empty-state";
+import { NoAccessState } from "@/components/states/no-access-state";
 import { ErrorState } from "@/components/states/error-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,9 @@ export function LeadDetailView({ id }: { id: string }) {
       {isPending ? (
         <DetailSkeleton />
       ) : error ? (
-        isApiError(error, "RECORD_NOT_FOUND") || isApiError(error, "BAD_REQUEST") ? (
+        isApiError(error, "PERMISSION_DENIED") ? (
+          <NoAccessState what="this lead" />
+        ) : isApiError(error, "RECORD_NOT_FOUND") || isApiError(error, "BAD_REQUEST") ? (
           <EmptyState
             icon={SearchXIcon}
             title="Lead not found"
@@ -87,6 +90,16 @@ export function LeadDetailView({ id }: { id: string }) {
                   </Detail>
                   <Detail label="Lead number">
                     <span className="font-mono text-xs">{lead.number}</span>
+                  </Detail>
+                  <Detail label="Owner">
+                    {lead.owner ? (
+                      <>
+                        {lead.owner.fullName}
+                        {!lead.owner.active && <Muted> (inactive)</Muted>}
+                      </>
+                    ) : (
+                      <Muted>Unassigned</Muted>
+                    )}
                   </Detail>
                 </dl>
               </CardContent>

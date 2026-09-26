@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { e2eUsers, storageState } from "./support/users";
+
 /**
- * The A0 vertical slice, end to end: browser → Next.js → Spring Boot → PostgreSQL.
+ * The leads vertical slice, end to end: browser → Next.js → Spring Boot → PostgreSQL.
  * Every assertion after a reload proves the data came back from the database, not from browser state.
  */
+test.use({ storageState: storageState("repA") });
 
 function uniqueLead() {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -15,7 +18,7 @@ function uniqueLead() {
   };
 }
 
-async function createLead(page: Page, lead: ReturnType<typeof uniqueLead>, extras?: { value?: string }) {
+async function createLead(page: Page, lead: ReturnType<typeof uniqueLead>, extras?: { value?: string; owner?: string }) {
   await page.getByRole("button", { name: "New lead" }).first().click();
   const dialog = page.getByRole("dialog", { name: "New lead" });
   await dialog.getByLabel("First name").fill(lead.firstName);
@@ -23,6 +26,10 @@ async function createLead(page: Page, lead: ReturnType<typeof uniqueLead>, extra
   await dialog.getByLabel("Company").fill(lead.company);
   await dialog.getByLabel("Email").fill(lead.email);
   if (extras?.value) await dialog.getByLabel("Estimated value (USD)").fill(extras.value);
+  if (extras?.owner) {
+    await dialog.getByLabel("Owner").click();
+    await page.getByRole("option", { name: extras.owner }).click();
+  }
   await dialog.getByRole("button", { name: "Create lead" }).click();
   return dialog;
 }
@@ -50,6 +57,7 @@ test("a created lead is persisted and survives a full reload", async ({ page }) 
   await expect(page.getByRole("heading", { name: `${lead.firstName} ${lead.lastName}` })).toBeVisible();
   await expect(page.getByText(lead.email).first()).toBeVisible();
   await expect(page.getByText("$48,000.00")).toBeVisible();
+  await expect(page.getByRole("main").getByText(e2eUsers().repA.fullName)).toBeVisible();
 });
 
 test("the search query lives in the URL", async ({ page }) => {
@@ -87,4 +95,35 @@ test("client-side validation blocks incomplete leads", async ({ page }) => {
 test("an unknown lead shows a not-found state", async ({ page }) => {
   await page.goto("/leads/00000000-0000-7000-8000-000000000000");
   await expect(page.getByRole("heading", { name: "Lead not found" })).toBeVisible();
+});
+
+test("reps see only their own leads and no owner controls", async ({ page, browser }) => {
+  const { repA, repB } = e2eUsers();
+  const lead = uniqueLead();
+
+  const managerContext = await browser.newContext({ storageState: storageState("manager") });
+  const manager = await managerContext.newPage();
+  await manager.goto("/leads");
+  await createLead(manager, lead, { owner: repB.fullName });
+  await expect(manager.getByRole("dialog")).toBeHidden();
+  await manager.getByRole("searchbox", { name: "Search leads" }).fill(lead.company);
+  await expect(manager.getByRole("row").filter({ hasText: lead.company })).toContainText(repB.fullName);
+
+  // Rep A can neither list nor open Rep B's lead.
+  await page.goto(`/leads?q=${encodeURIComponent(lead.company)}`);
+  await expect(page.getByRole("heading", { name: "No leads match" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Filter by owner" })).toHaveCount(0);
+  await manager.getByRole("link", { name: `${lead.firstName} ${lead.lastName}` }).click();
+  await expect(manager).toHaveURL(/\/leads\/[0-9a-f-]{36}$/);
+  await page.goto(new URL(manager.url()).pathname);
+  await expect(page.getByRole("heading", { name: "You don't have access" })).toBeVisible();
+
+  // Rep B sees it as their own.
+  const repBContext = await browser.newContext({ storageState: storageState("repB") });
+  const repBPage = await repBContext.newPage();
+  await repBPage.goto(`/leads?q=${encodeURIComponent(lead.company)}`);
+  await expect(repBPage.getByRole("row").filter({ hasText: lead.company })).toBeVisible();
+
+  await Promise.all([managerContext.close(), repBContext.close()]);
+  expect(repA.id).not.toBe(repB.id);
 });

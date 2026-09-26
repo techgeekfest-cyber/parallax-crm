@@ -2,12 +2,14 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * End-to-end tests run against the real stack: Next.js → Spring Boot → PostgreSQL.
- * Start the database and backend first (see README); Playwright starts the frontend.
+ * Start the database and backend first (see README); Playwright starts the frontend. Global setup signs in as the
+ * bootstrap admin (E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD, defaulting to the local-profile admin).
  */
 const port = Number(process.env.E2E_PORT ?? 3100);
 
 export default defineConfig({
   testDir: "e2e",
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,

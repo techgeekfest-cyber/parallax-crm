@@ -14,7 +14,7 @@ class LeadTests {
     @Test
     void newLeadStartsAsNewWithNormalisedInput() {
         Lead lead = Lead.create("  Grace ", "Hopper", " Navy Labs ", " Grace.Hopper@Example.COM ",
-                "   ", LeadSource.REFERRAL, new BigDecimal("12500.00"), null);
+                "   ", LeadSource.REFERRAL, new BigDecimal("12500.00"), null, null);
 
         assertThat(lead.getStatus()).isEqualTo(LeadStatus.NEW);
         assertThat(lead.getFirstName()).isEqualTo("Grace");
@@ -27,7 +27,7 @@ class LeadTests {
     @Test
     void requiredFieldsAreEnforcedWithTheOffendingFieldName() {
         assertThatThrownBy(() -> Lead.create("Grace", " ", "Navy Labs", "g@example.com",
-                null, null, null, null))
+                null, null, null, null, null))
                 .isInstanceOf(InvalidRequestException.class)
                 .extracting("field").isEqualTo("lastName");
     }
@@ -35,7 +35,7 @@ class LeadTests {
     @Test
     void estimatedValueCannotBeNegative() {
         assertThatThrownBy(() -> Lead.create("Grace", "Hopper", "Navy Labs", "g@example.com",
-                null, null, new BigDecimal("-1"), null))
+                null, null, new BigDecimal("-1"), null, null))
                 .isInstanceOf(InvalidRequestException.class)
                 .extracting("field").isEqualTo("estimatedValue");
     }
