@@ -1,0 +1,38 @@
+# Local development infrastructure for ParallaxCRM.
+#   docker compose up -d db        → PostgreSQL only (run backend/frontend on the host)
+#   docker compose --profile full up --build  → PostgreSQL + backend container
+name: parallaxcrm
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: parallaxcrm
+      POSTGRES_USER: parallax
+      POSTGRES_PASSWORD: parallax
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parallax -d parallaxcrm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    profiles: ["full"]
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://db:5432/parallaxcrm
+      DATABASE_USERNAME: parallax
+      DATABASE_PASSWORD: parallax
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

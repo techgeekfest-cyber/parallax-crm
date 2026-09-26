@@ -1,0 +1,11 @@
+# Local development against `docker compose up -d db`. Environment variables still win.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/parallaxcrm}
+    username: ${DATABASE_USERNAME:parallax}
+    password: ${DATABASE_PASSWORD:parallax}
+
+management:
+  endpoint:
+    health:
+      show-details: always

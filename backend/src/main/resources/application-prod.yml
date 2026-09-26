@@ -1,0 +1,11 @@
+# Production (Render). All database values must come from the environment.
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${OPENAPI_ENABLED:false}
+
+logging:
+  structured:
+    format:
+      console: ecs

@@ -1,0 +1,10 @@
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Environment files (keep the examples)
+.env
+.env.*
+!.env.example
