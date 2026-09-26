@@ -15,6 +15,7 @@ export type LeadSource = NonNullable<Lead["source"]>;
 export type LeadListParams = {
   q?: string;
   status?: LeadStatus;
+  ownerId?: string;
   /** zero-based */
   page: number;
   size: number;
@@ -38,6 +39,7 @@ export function useLeads(params: LeadListParams) {
             query: {
               q: params.q || undefined,
               status: params.status ? [params.status] : undefined,
+              ownerId: params.ownerId,
               page: params.page,
               size: params.size,
               sort: params.sort,

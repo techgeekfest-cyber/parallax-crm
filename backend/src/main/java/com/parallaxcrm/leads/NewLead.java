@@ -1,6 +1,7 @@
 package com.parallaxcrm.leads;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /** Input for creating a lead through {@link LeadService#create(NewLead)}. */
 public record NewLead(
@@ -11,5 +12,7 @@ public record NewLead(
         String phone,
         LeadSource source,
         BigDecimal estimatedValue,
-        String notes) {
+        String notes,
+        /* null means "assign to me" */
+        UUID ownerId) {
 }

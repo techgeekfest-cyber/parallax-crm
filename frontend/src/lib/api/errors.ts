@@ -55,6 +55,10 @@ export function describeError(error: unknown): string {
   return "Something unexpected happened. Please try again.";
 }
 
+export function isUnauthenticated(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
+
 export function isApiError(error: unknown, code?: string): error is ApiError {
   return error instanceof ApiError && (code === undefined || error.code === code);
 }

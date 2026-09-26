@@ -7,6 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import type { z } from "zod";
 
+import { FormError, FormField } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,11 +18,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { usePermissions } from "@/features/auth/api";
+import { useAssignableUsers } from "@/features/users/api";
 import { describeError, isApiError } from "@/lib/api/errors";
-import { cn } from "@/lib/utils";
 
 import { useCreateLead } from "./api";
 import { LEAD_SOURCE_LABELS, LEAD_SOURCES } from "./labels";
@@ -33,6 +34,9 @@ type FieldName = keyof LeadFormValues;
 export function CreateLeadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter();
   const createLead = useCreateLead();
+  const canAssign = usePermissions()?.accessAllSalesRecords ?? false;
+  const assignable = useAssignableUsers(canAssign && open);
+  const ownerItems = Object.fromEntries((assignable.data?.content ?? []).map((user) => [user.id, user.fullName]));
   const idPrefix = useId();
   const form = useForm<LeadFormValues, unknown, LeadFormOutput>({
     resolver: zodResolver(leadFormSchema),
@@ -69,10 +73,10 @@ export function CreateLeadDialog({ open, onOpenChange }: { open: boolean; onOpen
   }
 
   const fieldId = (name: FieldName) => `${idPrefix}-${name}`;
-  const text = (name: Exclude<FieldName, "source" | "notes">, label: string, props: React.ComponentProps<"input"> = {}) => (
-    <Field id={fieldId(name)} label={label} error={errors[name]?.message} optional={!["firstName", "lastName", "company", "email"].includes(name)}>
+  const text = (name: Exclude<FieldName, "source" | "notes" | "ownerId">, label: string, props: React.ComponentProps<"input"> = {}) => (
+    <FormField id={fieldId(name)} label={label} error={errors[name]?.message} optional={!["firstName", "lastName", "company", "email"].includes(name)}>
       <Input id={fieldId(name)} aria-invalid={!!errors[name]} {...form.register(name)} {...props} />
-    </Field>
+    </FormField>
   );
 
   return (
@@ -94,7 +98,7 @@ export function CreateLeadDialog({ open, onOpenChange }: { open: boolean; onOpen
             {text("phone", "Phone", { type: "tel", autoComplete: "tel" })}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field id={fieldId("source")} label="Source" error={errors.source?.message} optional>
+            <FormField id={fieldId("source")} label="Source" error={errors.source?.message} optional>
               <Controller
                 control={form.control}
                 name="source"
@@ -117,18 +121,46 @@ export function CreateLeadDialog({ open, onOpenChange }: { open: boolean; onOpen
                   </Select>
                 )}
               />
-            </Field>
+            </FormField>
             {text("estimatedValue", "Estimated value (USD)", { inputMode: "decimal", placeholder: "25000" })}
           </div>
-          <Field id={fieldId("notes")} label="Notes" error={errors.notes?.message} optional>
-            <Textarea id={fieldId("notes")} rows={3} aria-invalid={!!errors.notes} {...form.register("notes")} />
-          </Field>
-
-          {errors.root && (
-            <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errors.root.message}
-            </p>
+          {canAssign && (
+            <FormField
+              id={fieldId("ownerId")}
+              label="Owner"
+              error={errors.ownerId?.message}
+              hint="Leave empty to own this lead yourself."
+              optional
+            >
+              <Controller
+                control={form.control}
+                name="ownerId"
+                render={({ field }) => (
+                  <Select
+                    items={ownerItems}
+                    value={field.value || null}
+                    onValueChange={(value) => field.onChange(value ?? "")}
+                  >
+                    <SelectTrigger id={fieldId("ownerId")} className="w-full" onBlur={field.onBlur}>
+                      <SelectValue placeholder={assignable.isPending ? "Loading people…" : "Me"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(assignable.data?.content ?? []).map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormField>
           )}
+          <FormField id={fieldId("notes")} label="Notes" error={errors.notes?.message} optional>
+            <Textarea id={fieldId("notes")} rows={3} aria-invalid={!!errors.notes} {...form.register("notes")} />
+          </FormField>
+
+          <FormError message={errors.root?.message} />
         </form>
 
         <DialogFooter>
@@ -141,32 +173,5 @@ export function CreateLeadDialog({ open, onOpenChange }: { open: boolean; onOpen
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({
-  id,
-  label,
-  error,
-  optional,
-  children,
-}: {
-  id: string;
-  label: string;
-  error?: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id} className="flex items-baseline gap-1.5">
-        {label}
-        {optional && <span className="text-xs font-normal text-muted-foreground">optional</span>}
-      </Label>
-      {children}
-      <p className={cn("text-xs text-destructive", !error && "sr-only")} aria-live="polite">
-        {error}
-      </p>
-    </div>
   );
 }

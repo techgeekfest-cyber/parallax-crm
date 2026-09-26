@@ -14,6 +14,7 @@ import org.hibernate.annotations.Generated;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * A prospective customer. Created through {@link #create}, which normalises and validates input, so a {@code Lead}
@@ -55,6 +56,10 @@ public class Lead extends AbstractEntity {
 
     private String notes;
 
+    /** The user responsible for this lead. Reps only see leads they own. */
+    @Column(name = "owner_id")
+    private UUID ownerId;
+
     @Column(name = "archived_at")
     private Instant archivedAt;
 
@@ -63,7 +68,7 @@ public class Lead extends AbstractEntity {
     }
 
     public static Lead create(String firstName, String lastName, String company, String email, String phone,
-            LeadSource source, BigDecimal estimatedValue, String notes) {
+            LeadSource source, BigDecimal estimatedValue, String notes, UUID ownerId) {
         Lead lead = new Lead();
         lead.firstName = required("firstName", firstName);
         lead.lastName = required("lastName", lastName);
@@ -73,6 +78,7 @@ public class Lead extends AbstractEntity {
         lead.source = source;
         lead.estimatedValue = nonNegative("estimatedValue", estimatedValue);
         lead.notes = optional(notes);
+        lead.ownerId = ownerId;
         lead.status = LeadStatus.NEW;
         return lead;
     }
@@ -127,6 +133,10 @@ public class Lead extends AbstractEntity {
 
     public String getNotes() {
         return notes;
+    }
+
+    public UUID getOwnerId() {
+        return ownerId;
     }
 
     public Instant getArchivedAt() {

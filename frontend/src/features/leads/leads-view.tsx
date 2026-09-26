@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useMe } from "@/features/auth/api";
+import { useAssignableUsers } from "@/features/users/api";
 import { describeError } from "@/lib/api/errors";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
@@ -35,6 +37,7 @@ import { LeadStatusBadge } from "./lead-status-badge";
 
 const PAGE_SIZE = 25;
 const ALL_STATUSES = "ALL";
+const ALL_OWNERS = "ALL";
 const STATUS_FILTER_ITEMS = { [ALL_STATUSES]: "All statuses", ...LEAD_STATUS_LABELS };
 
 type SortField = "lastName" | "company" | "status" | "estimatedValue" | "createdAt";
@@ -48,7 +51,9 @@ function useLeadListParams() {
   const pathname = usePathname();
 
   const status = searchParams.get("status");
-  const params: LeadListParams = {
+  const owner = searchParams.get("owner") ?? undefined;
+  const params: LeadListParams & { owner?: string } = {
+    owner,
     q: searchParams.get("q") ?? undefined,
     status: status && (LEAD_STATUSES as string[]).includes(status) ? (status as LeadStatus) : undefined,
     page: Math.max(0, Number(searchParams.get("page") ?? "1") - 1) || 0,
@@ -76,11 +81,21 @@ function useLeadListParams() {
 
 export function LeadsView() {
   const { params, update } = useLeadListParams();
+  const { data: me } = useMe();
+  const seesAll = me?.permissions.accessAllSalesRecords ?? false;
+  const assignable = useAssignableUsers(seesAll);
   // The URL updates on every keystroke; only the request waits for typing to pause.
   const q = useDebouncedValue(params.q?.trim() || undefined, 300);
-  const { data, error, isPending, isFetching, refetch } = useLeads({ ...params, q });
+  const { owner, ...listParams } = params;
+  const ownerId = !seesAll ? undefined : owner === "me" ? me?.id : owner;
+  const { data, error, isPending, isFetching, refetch } = useLeads({ ...listParams, q, ownerId });
   const [createOpen, setCreateOpen] = useState(false);
-  const hasFilters = !!params.q || !!params.status;
+  const hasFilters = !!params.q || !!params.status || (seesAll && !!owner);
+  const ownerFilterItems = {
+    [ALL_OWNERS]: "All owners",
+    me: "My leads",
+    ...Object.fromEntries((assignable.data?.content ?? []).filter((u) => u.id !== me?.id).map((u) => [u.id, u.fullName])),
+  };
 
   const newLeadButton = (
     <Button onClick={() => setCreateOpen(true)}>
@@ -96,7 +111,9 @@ export function LeadsView() {
         description={
           data && (data.totalElements > 0 || hasFilters)
             ? `${data.totalElements.toLocaleString("en-US")} ${hasFilters ? "matching" : "active"} ${data.totalElements === 1 ? "lead" : "leads"}`
-            : "Prospects you are qualifying before they become customers."
+            : seesAll
+              ? "Prospects your team is qualifying before they become customers."
+              : "Your prospects, before they become customers."
         }
         actions={newLeadButton}
       />
@@ -120,6 +137,24 @@ export function LeadsView() {
             ))}
           </SelectContent>
         </Select>
+        {seesAll && (
+          <Select
+            items={ownerFilterItems}
+            value={owner ?? ALL_OWNERS}
+            onValueChange={(value) => update({ owner: value && value !== ALL_OWNERS ? value : undefined })}
+          >
+            <SelectTrigger aria-label="Filter by owner" className="w-full sm:w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(ownerFilterItems).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div
@@ -137,7 +172,7 @@ export function LeadsView() {
               title="No leads match"
               description="Try a different search term or status."
               action={
-                <Button variant="outline" onClick={() => update({ q: undefined, status: undefined })}>
+                <Button variant="outline" onClick={() => update({ q: undefined, status: undefined, owner: undefined })}>
                   Clear filters
                 </Button>
               }
@@ -171,7 +206,8 @@ export function LeadsView() {
                   sort={params.sort}
                   onSort={(sort) => update({ sort })}
                 />
-                <TableHead className="hidden lg:table-cell">Source</TableHead>
+                {seesAll && <TableHead className="hidden lg:table-cell">Sales rep</TableHead>}
+                <TableHead className="hidden 2xl:table-cell">Source</TableHead>
                 <SortableHead
                   field="createdAt"
                   label="Created"
@@ -183,7 +219,7 @@ export function LeadsView() {
             </TableHeader>
             <TableBody>
               {isPending || !data
-                ? Array.from({ length: 6 }, (_, i) => <SkeletonRow key={i} />)
+                ? Array.from({ length: 6 }, (_, i) => <SkeletonRow key={i} withOwner={seesAll} />)
                 : data.content.map((lead) => (
                     <TableRow key={lead.id} className="group relative">
                       <TableCell className="py-3">
@@ -206,7 +242,19 @@ export function LeadsView() {
                       <TableCell className="hidden text-right tabular-nums sm:table-cell">
                         {formatCurrency(lead.estimatedValue)}
                       </TableCell>
-                      <TableCell className="hidden text-muted-foreground lg:table-cell">
+                      {seesAll && (
+                        <TableCell className="hidden lg:table-cell">
+                          {lead.owner ? (
+                            <span className={cn(!lead.owner.active && "text-muted-foreground")}>
+                              {lead.owner.fullName}
+                              {!lead.owner.active && " (inactive)"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Unassigned</span>
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell className="hidden text-muted-foreground 2xl:table-cell">
                         {lead.source ? LEAD_SOURCE_LABELS[lead.source] : "—"}
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground md:table-cell">
@@ -291,7 +339,7 @@ function SortableHead({
   );
 }
 
-function SkeletonRow() {
+function SkeletonRow({ withOwner }: { withOwner: boolean }) {
   return (
     <TableRow>
       <TableCell className="py-3">
@@ -307,7 +355,12 @@ function SkeletonRow() {
       <TableCell className="hidden sm:table-cell">
         <Skeleton className="ml-auto h-4 w-16" />
       </TableCell>
-      <TableCell className="hidden lg:table-cell">
+      {withOwner && (
+        <TableCell className="hidden lg:table-cell">
+          <Skeleton className="h-4 w-24" />
+        </TableCell>
+      )}
+      <TableCell className="hidden 2xl:table-cell">
         <Skeleton className="h-4 w-16" />
       </TableCell>
       <TableCell className="hidden md:table-cell">

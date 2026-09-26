@@ -1,5 +1,6 @@
 package com.parallaxcrm.leads.web;
 
+import com.parallaxcrm.identity.UserSummary;
 import com.parallaxcrm.leads.LeadSource;
 import com.parallaxcrm.leads.LeadStatus;
 import com.parallaxcrm.leads.internal.Lead;
@@ -22,14 +23,15 @@ public record LeadResponse(
         @Nullable LeadSource source,
         @Nullable BigDecimal estimatedValue,
         @Nullable String notes,
+        @Nullable OwnerResponse owner,
         Instant createdAt,
         Instant updatedAt,
         long version) {
 
-    static LeadResponse from(Lead lead) {
+    static LeadResponse from(Lead lead, UserSummary owner) {
         return new LeadResponse(lead.getId(), lead.getNumber(), lead.getFirstName(), lead.getLastName(),
                 lead.fullName(), lead.getCompany(), lead.getEmail(), lead.getPhone(), lead.getStatus(),
-                lead.getSource(), lead.getEstimatedValue(), lead.getNotes(), lead.getCreatedAt(),
+                lead.getSource(), lead.getEstimatedValue(), lead.getNotes(), OwnerResponse.from(owner), lead.getCreatedAt(),
                 lead.getUpdatedAt(), lead.getVersion());
     }
 }

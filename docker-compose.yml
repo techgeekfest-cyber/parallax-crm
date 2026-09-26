@@ -31,6 +31,10 @@ services:
       DATABASE_URL: jdbc:postgresql://db:5432/parallaxcrm
       DATABASE_USERNAME: parallax
       DATABASE_PASSWORD: parallax
+      # Plain http on localhost, and a first admin for an empty local database.
+      SESSION_COOKIE_SECURE: "false"
+      ADMIN_BOOTSTRAP_EMAIL: admin@parallax.local
+      ADMIN_BOOTSTRAP_PASSWORD: parallax-local-admin
     ports:
       - "8080:8080"
 

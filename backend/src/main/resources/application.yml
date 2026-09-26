@@ -25,6 +25,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  session:
+    timeout: 8h
+    jdbc:
+      initialize-schema: never
+      cleanup-cron: "0 */5 * * * *"
   jackson:
     default-property-inclusion: non_null
 
@@ -62,3 +67,15 @@ springdoc:
     enabled: ${OPENAPI_ENABLED:true}
   paths-to-match: /api/**
   default-produces-media-type: application/json
+
+parallax:
+  security:
+    # Secure flag on the session and CSRF cookies. Only plain-http local development turns it off.
+    secure-cookies: ${SESSION_COOKIE_SECURE:true}
+    # Consecutive failed sign-ins per email before a temporary lock-out.
+    max-failed-logins: 5
+    login-lockout: 15m
+  bootstrap:
+    # Creates the first ADMIN only when the users table is empty and both values are set.
+    admin-email: ${ADMIN_BOOTSTRAP_EMAIL:}
+    admin-password: ${ADMIN_BOOTSTRAP_PASSWORD:}

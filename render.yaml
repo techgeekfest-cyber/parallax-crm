@@ -19,3 +19,8 @@ services:
         sync: false
       - key: DATABASE_POOL_SIZE
         value: "5"
+      # First deploy only: creates the initial admin on an empty database. Remove after signing in.
+      - key: ADMIN_BOOTSTRAP_EMAIL
+        sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD
+        sync: false

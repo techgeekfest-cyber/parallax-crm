@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /** Translates list filters into a JPA criteria query. Archived leads are always excluded. */
 public final class LeadSpecifications {
@@ -15,10 +16,14 @@ public final class LeadSpecifications {
     private LeadSpecifications() {
     }
 
-    public static Specification<Lead> matching(String query, Collection<LeadStatus> statuses) {
+    /** @param ownerId restrict to one owner, or {@code null} for all owners */
+    public static Specification<Lead> matching(String query, Collection<LeadStatus> statuses, UUID ownerId) {
         return (root, criteriaQuery, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.isNull(root.get("archivedAt")));
+            if (ownerId != null) {
+                predicates.add(cb.equal(root.get("ownerId"), ownerId));
+            }
             if (statuses != null && !statuses.isEmpty()) {
                 predicates.add(root.get("status").in(statuses));
             }

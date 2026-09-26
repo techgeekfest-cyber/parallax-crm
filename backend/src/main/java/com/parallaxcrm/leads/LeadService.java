@@ -2,10 +2,15 @@ package com.parallaxcrm.leads;
 
 import com.parallaxcrm.audit.AuditAction;
 import com.parallaxcrm.audit.AuditTrail;
+import com.parallaxcrm.identity.AccessPolicy;
+import com.parallaxcrm.identity.AuthenticatedUser;
+import com.parallaxcrm.identity.CurrentUser;
+import com.parallaxcrm.identity.UserDirectory;
 import com.parallaxcrm.leads.internal.Lead;
 import com.parallaxcrm.leads.internal.LeadRepository;
 import com.parallaxcrm.leads.internal.LeadSpecifications;
 import com.parallaxcrm.shared.error.DuplicateRecordException;
+import com.parallaxcrm.shared.error.PermissionDeniedException;
 import com.parallaxcrm.shared.error.RecordNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +24,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Public API of the leads module. Every write runs in a transaction that also records the audit event.
+ * Public API of the leads module. Every operation is authorised through {@link AccessPolicy}, and every write runs in
+ * a transaction that also records the audit event.
  */
 @Service
 @Transactional(readOnly = true)
@@ -29,16 +35,28 @@ public class LeadService {
 
     private final LeadRepository leads;
     private final AuditTrail auditTrail;
+    private final CurrentUser currentUser;
+    private final AccessPolicy accessPolicy;
+    private final UserDirectory userDirectory;
 
-    LeadService(LeadRepository leads, AuditTrail auditTrail) {
+    LeadService(LeadRepository leads, AuditTrail auditTrail, CurrentUser currentUser, AccessPolicy accessPolicy,
+            UserDirectory userDirectory) {
         this.leads = leads;
         this.auditTrail = auditTrail;
+        this.currentUser = currentUser;
+        this.accessPolicy = accessPolicy;
+        this.userDirectory = userDirectory;
     }
 
     @Transactional
     public Lead create(NewLead input) {
+        AuthenticatedUser actor = currentUser.require();
+        UUID ownerId = input.ownerId() != null ? input.ownerId() : actor.id();
+        accessPolicy.requireCanAssignTo(actor, ownerId);
+        userDirectory.requireAssignable(ownerId, "ownerId");
+
         Lead lead = Lead.create(input.firstName(), input.lastName(), input.company(), input.email(),
-                input.phone(), input.source(), input.estimatedValue(), input.notes());
+                input.phone(), input.source(), input.estimatedValue(), input.notes(), ownerId);
 
         // Friendly duplicate check; the uq_leads_email index remains the guarantee under concurrent inserts.
         if (leads.existsByEmailIgnoreCaseAndArchivedAtIsNull(lead.getEmail())) {
@@ -52,13 +70,27 @@ public class LeadService {
     }
 
     public Lead get(UUID id) {
-        return leads.findById(id)
-                .filter(lead -> !lead.isArchived())
+        Lead lead = leads.findById(id)
+                .filter(candidate -> !candidate.isArchived())
                 .orElseThrow(() -> new RecordNotFoundException(RECORD_TYPE, id));
+        accessPolicy.requireAccessToRecordOwnedBy(currentUser.require(), "lead", lead.getOwnerId());
+        return lead;
     }
 
-    public Page<Lead> list(String query, Collection<LeadStatus> statuses, Pageable pageable) {
-        return leads.findAll(LeadSpecifications.matching(query, statuses), pageable);
+    /**
+     * @param ownerId optional owner filter. Reps are always limited to their own leads; asking for someone else's is
+     *                refused rather than silently ignored.
+     */
+    public Page<Lead> list(String query, Collection<LeadStatus> statuses, UUID ownerId, Pageable pageable) {
+        AuthenticatedUser actor = currentUser.require();
+        UUID effectiveOwner = ownerId;
+        if (!accessPolicy.canAccessAllSalesRecords(actor)) {
+            if (ownerId != null && !ownerId.equals(actor.id())) {
+                throw new PermissionDeniedException("You can only view your own leads.");
+            }
+            effectiveOwner = actor.id();
+        }
+        return leads.findAll(LeadSpecifications.matching(query, statuses, effectiveOwner), pageable);
     }
 
     private static Map<String, Object> snapshot(Lead lead) {
@@ -72,6 +104,7 @@ public class LeadService {
         values.put("status", lead.getStatus());
         values.put("source", lead.getSource());
         values.put("estimatedValue", lead.getEstimatedValue());
+        values.put("ownerId", lead.getOwnerId());
         values.values().removeIf(Objects::isNull);
         return values;
     }

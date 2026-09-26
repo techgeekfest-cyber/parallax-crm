@@ -3,8 +3,8 @@
 **Enterprise Customer Relationship Platform** — leads, accounts, contacts, opportunities, pipeline and analytics,
 built as a real full-stack application: Next.js → Spring Boot → PostgreSQL.
 
-> Status: **Phase A0 — foundation.** The first vertical slice (Leads: create, list, search, filter, sort, paginate,
-> view) is live end to end. See the [roadmap](#roadmap).
+> Status: **Phase A1 — authentication and roles.** Sign-in with database-backed sessions, three roles enforced by the
+> API, user administration, and lead ownership on top of the A0 Leads slice. See the [roadmap](#roadmap).
 
 ParallaxCRM is a ground-up rebuild of a Java OOP coursework project. The original domain model — leads, contacts,
 opportunities, an `Account` hierarchy (Enterprise / SMB / Startup), sales reps — is kept, but redesigned as a
@@ -38,6 +38,7 @@ production-style modular monolith with a real database, a documented REST API, a
 ├── backend/                 Spring Boot API (Maven)
 │   └── src/main/java/com/parallaxcrm/
 │       ├── shared/          base entity, error model, paging, request IDs (open module)
+│       ├── identity/        users, sign-in, sessions, roles, access policy
 │       ├── leads/           Lead module: public service, internal domain, web layer
 │       └── audit/           immutable audit trail
 ├── frontend/                Next.js app
@@ -72,7 +73,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. The database starts empty; create your first lead from the Leads page.
+Open http://localhost:3000 and sign in as the development admin that the `local` profile creates on an empty
+database: **admin@parallax.local** / **parallax-local-admin**. From **Users** you can add sales managers and reps.
+No CRM data is seeded; create your first lead from the Leads page.
 
 Useful URLs while the backend is running:
 
@@ -91,7 +94,8 @@ cd backend && ./mvnw verify
 # Frontend: lint, typecheck, unit tests, production build
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 
-# End to end (database and backend must be running; Playwright starts the frontend)
+# End to end (database and backend must be running; Playwright starts the frontend and signs in as the
+# bootstrap admin — override with E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD)
 cd frontend && npx playwright install chromium && npm run e2e
 # Against a freshly migrated, empty database, also run the first-run check:
 E2E_FRESH_DB=1 npm run e2e
@@ -118,6 +122,8 @@ configuration model ([ADR 0003](docs/adr/0003-postgresql-neon-provider-agnostic.
 | `DATABASE_USERNAME` / `DATABASE_PASSWORD` | backend | Database credentials |
 | `DATABASE_POOL_SIZE` | backend | Hikari pool size (default 5) |
 | `SPRING_PROFILES_ACTIVE` | backend | `local` (default) or `prod` |
+| `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` | backend | First admin, created only when there are no users |
+| `SESSION_COOKIE_SECURE` | backend | `Secure` cookie flag (default `true`; `false` only for plain-http localhost) |
 | `OPENAPI_ENABLED` | backend | Swagger UI and `/v3/api-docs` (default: on locally, off in prod) |
 | `BACKEND_URL` | frontend | Backend origin that `/api/*` is proxied to |
 
@@ -128,21 +134,31 @@ See `backend/.env.example` and `frontend/.env.example`.
 | Component | Platform | Setup |
 |---|---|---|
 | Database | Neon | Create a project; copy the **direct** (non-pooled) connection details |
-| Backend | Render | New Blueprint from `render.yaml`, then set `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` |
+| Backend | Render | New Blueprint from `render.yaml`, then set `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, and for the first deploy `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` |
 | Frontend | Vercel | Import the repo with root directory `frontend`; set `BACKEND_URL` to the Render service URL |
 
 Neon shows connection strings as `postgresql://user:password@host/dbname?sslmode=require`. Convert to the JDBC form
 `jdbc:postgresql://host/dbname?sslmode=require` and pass the user and password separately.
 
-## API (A0)
+## API
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/v1/leads` | List leads — `q`, `status`, `page`, `size` (≤ 100), `sort=field,asc\|desc` |
-| `POST` | `/api/v1/leads` | Create a lead → `201 Created` with `Location` |
-| `GET` | `/api/v1/leads/{id}` | Get a lead |
-| `GET` | `/actuator/health` | Liveness/readiness, including database connectivity |
+| Method | Path | Who | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/auth/csrf` | anyone | Issue the `XSRF-TOKEN` cookie |
+| `POST` | `/api/v1/auth/login` | anyone | Sign in; starts a `PARALLAX_SESSION` |
+| `POST` | `/api/v1/auth/logout` | signed in | Sign out; deletes the server-side session |
+| `GET` | `/api/v1/auth/me` | signed in | Current user and permission flags |
+| `PUT` | `/api/v1/auth/password` | signed in | Change password; signs out other sessions |
+| `GET` | `/api/v1/users` | admin, manager | List users — `q`, `role`, `active`, paging |
+| `GET` | `/api/v1/users/{id}` | admin, manager | Get a user |
+| `POST` | `/api/v1/users` | admin | Create a user |
+| `PUT` | `/api/v1/users/{id}` | admin | Update name, role, active (with `version`); role/active changes end their sessions |
+| `GET` | `/api/v1/leads` | signed in | List leads — `q`, `status`, `ownerId`, paging, `sort`. Reps see only their own |
+| `POST` | `/api/v1/leads` | signed in | Create a lead; `ownerId` defaults to you (only managers/admins may assign others) |
+| `GET` | `/api/v1/leads/{id}` | owner, manager, admin | Get a lead |
+| `GET` | `/actuator/health` | anyone | Liveness/readiness, including database connectivity |
 
+Write requests must send the `XSRF-TOKEN` cookie value in the `X-XSRF-TOKEN` header.
 Errors use RFC 7807 ProblemDetail with a stable `code` (`VALIDATION_FAILED`, `DUPLICATE_RECORD`, `RECORD_NOT_FOUND`, …),
 `fieldErrors` where relevant, and a `requestId` that matches the `X-Request-Id` response header.
 
@@ -151,7 +167,7 @@ Errors use RFC 7807 ProblemDetail with a stable `code` (`VALIDATION_FAILED`, `DU
 | Phase | Scope |
 |---|---|
 | **A0** ✅ | Foundation, CI, Docker, Flyway schema, Leads vertical slice |
-| A1 | Authentication (Spring Session), roles (Admin / Sales Manager / Sales Rep), access policy |
+| **A1** ✅ | Authentication (Spring Session), roles (Admin / Sales Manager / Sales Rep), access policy, user admin |
 | A2 | Sales reps, account hierarchy, contacts, opportunities; editing, archiving, assignment |
 | A3 | Lead conversion, opportunity stage machine and history, Kanban pipeline, conflict handling |
 | A4 | Live dashboard and analytics |

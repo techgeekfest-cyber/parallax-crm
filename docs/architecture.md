@@ -42,9 +42,9 @@ top-level package is its public API, and sub-packages are internal. Boundaries a
 | Module | Responsibility | Status |
 |---|---|---|
 | `shared` | Base entity, error model (`ParallaxException` family), ProblemDetail handler, paging, request IDs. Open module. | A0 |
-| `leads` | Lead lifecycle; later conversion workflow | A0 (create/read/list) |
+| `leads` | Lead lifecycle and ownership; later conversion workflow | A0–A1 (create/read/list, owner scoping) |
 | `audit` | Immutable change log, written synchronously in the same transaction as the change | A0 (write path) |
-| `identity` | Users, sessions, roles, access policy | A1 |
+| `identity` | Users, sign-in, database-backed sessions, roles, `AccessPolicy`, user administration | A1 |
 | `salesteam` | Sales rep profiles, quotas, territories | A2 |
 | `accounts` | Account hierarchy (Enterprise / SMB / Startup) | A2 |
 | `contacts` | Contacts | A2 |
@@ -140,15 +140,46 @@ stage history, activities and audit events — so cross-entity foreign keys exis
   and survive refresh without a server round trip per keystroke. Only the request is debounced, never the URL write.
 - Per-device conveniences only (theme, sidebar collapse) may live in browser storage.
 
-## Authentication and authorization (A1)
+## Authentication and authorization
 
-- Email + password (BCrypt), Spring Security with Spring Session JDBC, `HttpOnly; Secure; SameSite=Lax` cookie,
-  cookie-to-header CSRF ([ADR 0002](adr/0002-session-authentication.md)).
-- Roles: `ADMIN`, `SALES_MANAGER`, `SALES_REP`. Role checks via `@PreAuthorize`; record-level checks via an
-  `AccessPolicy` that throws `PermissionDeniedException`. The UI hides actions using server-provided permission flags,
-  but the backend always enforces.
-- The first admin is created only when the `users` table is empty and `ADMIN_BOOTSTRAP_EMAIL` /
-  `ADMIN_BOOTSTRAP_PASSWORD` are set.
+Implemented in A1 ([ADR 0002](adr/0002-session-authentication.md)).
+
+**Sessions.** `POST /api/v1/auth/login` verifies the password (BCrypt via Spring's delegating encoder), invalidates any
+session already present in the browser, and starts a new one stored in PostgreSQL by Spring Session JDBC. The
+`PARALLAX_SESSION` cookie is `HttpOnly; SameSite=Lax` and `Secure` everywhere except plain-http local development.
+Sessions last 8 hours of inactivity. Anonymous requests never create sessions.
+
+**What the session holds.** Only the user's id (as the principal name) and role, using JDK/Spring types, so deploys
+never break existing sessions. `CurrentUser` reloads the user from the database once per request, so a role change or
+deactivation applies on the very next request. Role changes, deactivation and password changes also delete the
+affected sessions (Spring Session's principal-name index).
+
+**CSRF.** Cookie-to-header: the readable `XSRF-TOKEN` cookie is echoed in `X-XSRF-TOKEN` on every write. The frontend
+fetches `GET /api/v1/auth/csrf` when the cookie is missing (for example right after sign-in, which rotates the token).
+
+**Brute force and enumeration.** Unknown email, wrong password and deactivated account all return the same
+`401 UNAUTHENTICATED` message, with equalised hashing time. Five failures lock that email for 15 minutes
+(`429 RATE_LIMITED` with `Retry-After`). The limiter is in memory, which is correct for the single backend instance.
+
+**Authorization.** All decisions go through `identity.AccessPolicy`, which throws `PermissionDeniedException`
+(`403 PERMISSION_DENIED`). Modules call it before acting; the UI hides actions using the `permissions` returned by
+`GET /api/v1/auth/me`, but never relies on that.
+
+| Capability | ADMIN | SALES_MANAGER | SALES_REP |
+|---|---|---|---|
+| See / work leads owned by others | ✓ | ✓ (organisation-wide until teams exist in A2) | — |
+| Assign leads to other people | ✓ | ✓ | — (always the owner of what they create) |
+| View the user directory | ✓ | ✓ | — |
+| Create users, change roles, deactivate | ✓ | — | — |
+
+Admins cannot change their own role or deactivate themselves, so an organisation always keeps an active admin.
+
+**First admin.** `AdminBootstrap` creates one only when the `users` table is empty and `ADMIN_BOOTSTRAP_EMAIL` /
+`ADMIN_BOOTSTRAP_PASSWORD` are set (the `local` profile supplies development defaults). Passwords need 12–72 characters.
+
+**Frontend.** `src/proxy.ts` redirects requests without a session cookie to `/login?next=…` (an optimistic check only).
+Any `401` from the API sends the browser to `/login` with a full page load, which discards every cached query.
+`next` is restricted to same-site paths.
 
 ## Deployment
 

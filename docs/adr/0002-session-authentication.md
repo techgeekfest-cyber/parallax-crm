@@ -1,6 +1,6 @@
 # ADR 0002 — Server-side sessions instead of JWT in browser storage
 
-**Status:** Accepted (implemented in A1)
+**Status:** Accepted — implemented in A1
 
 ## Context
 
@@ -9,7 +9,8 @@ backend (Render) are on different hosts.
 
 ## Decision
 
-- Spring Security form-style JSON login with BCrypt password hashes.
+- A JSON sign-in endpoint with BCrypt password hashes. Sign-in always discards any existing session and starts a new
+  one (session fixation protection), and the session stores only the user's id, re-read from the database per request.
 - Sessions stored in PostgreSQL via **Spring Session JDBC**, so they survive restarts and redeploys.
 - Session cookie: `HttpOnly; Secure; SameSite=Lax`. CSRF protection via cookie-to-header token.
 - The Next.js app rewrites `/api/*` to the backend, so the browser sees a single origin. The session cookie is

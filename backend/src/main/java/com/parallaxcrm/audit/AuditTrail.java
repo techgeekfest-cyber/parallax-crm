@@ -2,6 +2,7 @@ package com.parallaxcrm.audit;
 
 import com.parallaxcrm.audit.internal.AuditEvent;
 import com.parallaxcrm.audit.internal.AuditEventRepository;
+import com.parallaxcrm.shared.security.Actors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +32,8 @@ public class AuditTrail {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(AuditAction action, String entityType, UUID entityId, Map<String, ?> changes) {
-        // Actor attribution arrives with authentication (A1); until then changes are recorded as system changes.
-        events.save(new AuditEvent(entityType, entityId, action.name(), null, json.writeValueAsString(changes)));
+        // No signed-in actor means a system change (e.g. the initial admin bootstrap).
+        UUID actorId = Actors.currentActorId().orElse(null);
+        events.save(new AuditEvent(entityType, entityId, action.name(), actorId, json.writeValueAsString(changes)));
     }
 }

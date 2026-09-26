@@ -4,10 +4,10 @@ import com.parallaxcrm.shared.error.DuplicateRecordException;
 import com.parallaxcrm.shared.error.ErrorCode;
 import com.parallaxcrm.shared.error.InvalidRequestException;
 import com.parallaxcrm.shared.error.ParallaxException;
+import com.parallaxcrm.shared.error.RateLimitedException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,17 +38,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ParallaxException.class)
     ResponseEntity<ProblemDetail> handleParallax(ParallaxException ex) {
-        HttpStatus status = statusFor(ex.getCode());
-        ProblemDetail problem = problem(status, ex.getCode(), ex.getMessage());
+        HttpStatus status = Problems.statusFor(ex.getCode());
+        ProblemDetail problem = Problems.of(status, ex.getCode(), ex.getMessage());
         String field = switch (ex) {
             case DuplicateRecordException duplicate -> duplicate.getField();
             case InvalidRequestException invalid -> invalid.getField();
             default -> null;
         };
         if (field != null) {
-            problem.setProperty("fieldErrors", List.of(new FieldError(field, ex.getMessage())));
+            Problems.withFieldErrors(problem, List.of(new FieldError(field, ex.getMessage())));
         }
-        return ResponseEntity.status(status).body(problem);
+        var response = ResponseEntity.status(status);
+        if (ex instanceof RateLimitedException limited) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(limited.getRetryAfter().toSeconds()));
+        }
+        return response.body(problem);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex) {
+        return respond(HttpStatus.FORBIDDEN, ErrorCode.PERMISSION_DENIED, "You don't have permission to do that.");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException ex) {
+        return respond(HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED, "Sign in to continue.");
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
@@ -77,18 +93,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED,
-                "Some fields are missing or invalid.");
-        problem.setProperty("fieldErrors", ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> new FieldError(error.getField(), error.getDefaultMessage()))
-                .toList());
+        ProblemDetail problem = Problems.withFieldErrors(
+                Problems.of(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED, "Some fields are missing or invalid."),
+                ex.getBindingResult().getFieldErrors().stream()
+                        .map(error -> new FieldError(error.getField(), error.getDefaultMessage()))
+                        .toList());
         return ResponseEntity.badRequest().body(problem);
     }
 
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        return ResponseEntity.badRequest().body(problem(HttpStatus.BAD_REQUEST, ErrorCode.BAD_REQUEST,
+        return ResponseEntity.badRequest().body(Problems.of(HttpStatus.BAD_REQUEST, ErrorCode.BAD_REQUEST,
                 "The request body is not valid JSON or contains a value of the wrong type."));
     }
 
@@ -102,37 +118,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ErrorCode code = statusCode.value() == 404 ? ErrorCode.NOT_FOUND
                     : statusCode.is4xxClientError() ? ErrorCode.BAD_REQUEST
                     : ErrorCode.INTERNAL_ERROR;
-            decorate(problem, code);
+            Problems.decorate(problem, code);
         }
         return response;
     }
 
     private static ResponseEntity<ProblemDetail> respond(HttpStatus status, ErrorCode code, String detail) {
-        return ResponseEntity.status(status).body(problem(status, code, detail));
-    }
-
-    private static ProblemDetail problem(HttpStatus status, ErrorCode code, String detail) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        return decorate(problem, code);
-    }
-
-    private static ProblemDetail decorate(ProblemDetail problem, ErrorCode code) {
-        problem.setProperty("code", code.name());
-        String requestId = MDC.get(RequestIdFilter.MDC_KEY);
-        if (requestId != null) {
-            problem.setProperty("requestId", requestId);
-        }
-        return problem;
-    }
-
-    private static HttpStatus statusFor(ErrorCode code) {
-        return switch (code) {
-            case VALIDATION_FAILED, BAD_REQUEST -> HttpStatus.BAD_REQUEST;
-            case NOT_FOUND, RECORD_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case DUPLICATE_RECORD, CONFLICT, DATA_INTEGRITY -> HttpStatus.CONFLICT;
-            case PERMISSION_DENIED -> HttpStatus.FORBIDDEN;
-            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-        };
+        return ResponseEntity.status(status).body(Problems.of(status, code, detail));
     }
 
     private static String constraintName(Throwable ex) {
