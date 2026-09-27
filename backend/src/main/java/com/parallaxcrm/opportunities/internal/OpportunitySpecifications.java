@@ -29,14 +29,22 @@ public final class OpportunitySpecifications {
             if (ownerId != null) {
                 predicates.add(cb.equal(root.get("ownerId"), ownerId));
             }
-            if (query != null && !query.isBlank()) {
-                String pattern = "%" + query.strip().toLowerCase(Locale.ROOT)
-                        .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+            String pattern = likePattern(query);
+            if (pattern != null) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("name")), pattern, '\\'),
                         cb.like(cb.lower(root.get("number")), pattern, '\\')));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
+    }
+
+    /** A lower-case {@code %…%} LIKE pattern with wildcards escaped (backslash is the escape character), or null. */
+    public static String likePattern(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        return "%" + query.strip().toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
     }
 }

@@ -42,14 +42,14 @@ top-level package is its public API, and sub-packages are internal. Boundaries a
 | Module | Responsibility | Status |
 |---|---|---|
 | `shared` | Base entity, error model (`ParallaxException` family), ProblemDetail handler, paging, request IDs. Open module. | A0 |
-| `leads` | Lead lifecycle and ownership; later conversion workflow | A0–A1 (create/read/list, owner scoping) |
+| `leads` | Lead lifecycle and ownership, status workflow, conversion into account + contact + opportunity | A0–A3 |
 | `audit` | Immutable change log, written synchronously in the same transaction as the change | A0 (write path) |
 | `identity` | Users, sign-in, database-backed sessions, roles, `AccessPolicy`, user administration | A1 |
 | `salesteam` | Sales profiles (territory, title, quota) of users with a sales role, plus live figures (YTD sales, attainment, pipeline) computed from owned records | A2 |
 | `accounts` | Account hierarchy (Enterprise / SMB / Startup) with per-subtype tier and support rules | A2 |
 | `contacts` | People at accounts; one primary contact per account | A2 |
-| `opportunities` | Deals on accounts, pipeline totals, stage history (transition workflow and Kanban in A3) | A2 |
-| `activities` | User-facing timeline | B1 |
+| `opportunities` | Deals on accounts, stage-transition workflow and history, pipeline totals and Kanban board | A2–A3 |
+| `activities` | Timeline of logged calls, emails, meetings and notes, plus workflow events; per-record access through `TimelineAccess` | A3 |
 | `search`, `analytics` | Read-only cross-entity queries | B2, A4 |
 | `intelligence` | Scoring, risk, recommendations — listens to events, core never depends on it | C |
 
@@ -81,6 +81,26 @@ The account hierarchy uses JPA `JOINED` inheritance (`accounts` + `enterprise_ac
 An account's type is fixed at creation. Opportunities derive probability from their stage (overridable while open,
 forced to 100/0 when closed) and record every stage they enter in `opportunity_stage_history`, in the same transaction.
 
+### Workflows (A3)
+
+Business actions are explicit sub-resources, never a side effect of a generic edit ([ADR 0008](adr/0008-opportunity-stage-workflow.md)):
+
+| Action | Endpoint | Writes, in one transaction |
+|---|---|---|
+| Lead status change | `POST /leads/{id}/status-transitions` | lead, `UPDATE` audit, `RECORD_UPDATE` activity |
+| Lead conversion | `POST /leads/{id}/conversion` | account (or link to existing), contact, opportunity + first stage history, their `CREATE` audits, lead `CONVERT` audit, `LEAD_CONVERSION` activity |
+| Stage transition | `POST /opportunities/{id}/stage-transitions` | opportunity, stage history row, `STAGE_CHANGE` audit, `STAGE_CHANGE` activity |
+| Reassignment | `PUT /opportunities/{id}` with a new owner | opportunity, `UPDATE` audit, `ASSIGNMENT` activity |
+
+Stage rules live on `OpportunityStage`; every opportunity and pipeline card carries the `allowedStages` the viewer may
+move it to, so the UI never re-implements them. Workflow errors are `409` with a specific code
+(`INVALID_STATE_TRANSITION`, `ALREADY_CONVERTED`); a stale `version` is `409 CONFLICT`.
+
+**Activities** link to one or more of lead, account, contact and opportunity (a conversion links all four). The
+`activities` module never depends on those modules: each contributes a `TimelineAccess` bean, so reading or adding to
+a timeline follows exactly the access rules of the record itself (reps: their own leads and deals; everyone: accounts
+and contacts). People log `CALL`, `EMAIL`, `MEETING` and `NOTE`; the other types are written only by workflows.
+
 **Cross-module composition.** `contacts`, `opportunities` and `salesteam` depend on `accounts` (and `salesteam` on
 `leads` and `opportunities` for its figures); nothing depends back on them. The account page is therefore composed by
 the frontend from `GET /accounts/{id}`, `GET /contacts?accountId=`, `GET /opportunities?accountId=` and
@@ -97,6 +117,8 @@ All errors are RFC 7807 `ProblemDetail` responses with a stable machine-readable
 | `RECORD_NOT_FOUND` | 404 | `RecordNotFoundException` |
 | `DUPLICATE_RECORD` | 409 | `DuplicateRecordException`, or a `uq_*` database constraint |
 | `CONFLICT` | 409 | Optimistic-lock version mismatch |
+| `INVALID_STATE_TRANSITION` | 409 | A workflow move the record's state doesn't allow (stage skip, unqualified lead) |
+| `ALREADY_CONVERTED` | 409 | Converting, or changing the status of, a lead that is already converted |
 | `DATA_INTEGRITY` | 409 | Other database constraint violations |
 | `PERMISSION_DENIED` | 403 | `PermissionDeniedException` (A1) |
 | `INTERNAL_ERROR` | 500 | Anything unexpected — logged with the request ID; never includes a stack trace |
@@ -110,7 +132,7 @@ last saw; a mismatch returns `409 CONFLICT` with the current server state so the
 
 ### Audit and activities
 
-Audit rows (and, from B1, activity rows) are written **synchronously inside the transaction** that performs the change,
+Audit rows and system activity rows are written **synchronously inside the transaction** that performs the change,
 so they commit or roll back with it. Asynchronous after-commit listeners are reserved for non-critical consumers
 (real-time push, intelligence) and will use Spring Modulith's event publication registry when introduced.
 
@@ -145,7 +167,9 @@ stage history, activities and audit events — so cross-entity foreign keys exis
 
 - Next.js App Router + TypeScript + Tailwind + shadcn/ui.
 - All CRM data is fetched from the API through TanStack Query hooks in `src/features/*/api.ts`.
-  The server's response is always authoritative; optimistic updates are reconciled or rolled back.
+  The server's response is always authoritative; optimistic updates are reconciled or rolled back. On the Kanban
+  board (`/pipeline`, dnd-kit) a dropped card moves at once, the real stage-transition API decides, and the board is
+  refetched either way; only cards move optimistically — column counts and totals are always the server's.
 - Types come from the backend's OpenAPI document (`npm run api:types` → `src/lib/api/schema.d.ts`). Response
   record fields are required in the schema unless annotated with JSpecify `@Nullable`, so the TypeScript types mirror
   Java nullability exactly. CI fails if the committed types drift from the backend.
@@ -222,7 +246,7 @@ Configuration is provider-agnostic ([ADR 0003](adr/0003-postgresql-neon-provider
 | **A0** ✅ | Foundations + Lead vertical slice (PostgreSQL → API → UI), CI, Docker, health checks |
 | **A1** ✅ | Authentication, roles, access policy |
 | **A2** ✅ | Sales reps, account hierarchy, contacts, opportunities: CRUD, archive/restore, search, filters, permissions |
-| A3 | Lead conversion, opportunity stage machine + history, Kanban, conflict handling |
+| **A3** ✅ | Lead status and conversion, opportunity stage workflow + history, Kanban pipeline, activity timeline, conflict handling |
 | A4 | Live dashboard and analytics queries |
-| B | Activity timeline, audit viewer, command palette + search, CSV import/export, polish |
+| B | Audit viewer, command palette + search, CSV import/export, polish |
 | Later | SSE real-time updates; intelligence module |

@@ -61,13 +61,17 @@ export function opportunityToForm(opportunity: Opportunity): OpportunityFormValu
   };
 }
 
+/**
+ * Without a version this is a create, which sets the starting stage. With a version it is an edit, which never sends
+ * a stage: stages change only through the stage-transition workflow.
+ */
 export function toOpportunityRequest(values: OpportunityFormOutput, version?: number): OpportunityRequest {
   const stage = values.stage as OpportunityStage;
   return {
     accountId: values.account.id,
     name: values.name.trim(),
     amount: toNumber(values.amount)!,
-    stage,
+    stage: version === undefined ? stage : undefined,
     // Closed stages always get 100/0 on the server; an empty field means "use the stage default".
     probability: isClosed(stage) ? undefined : toNumber(values.probability),
     closeDate: values.closeDate,

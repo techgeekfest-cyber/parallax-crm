@@ -40,3 +40,11 @@ describe("opportunity form", () => {
     expect(request.type).toBeUndefined();
   });
 });
+
+describe("opportunity form and the stage workflow", () => {
+  it("sets the starting stage on create but never sends a stage on edit", () => {
+    const values = opportunityFormSchema.parse({ ...emptyOpportunityForm(account), name: "Deal", amount: "10", stage: "PROPOSAL" });
+    expect(toOpportunityRequest(values).stage).toBe("PROPOSAL");
+    expect(toOpportunityRequest(values, 3).stage).toBeUndefined();
+  });
+});

@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ActivityTimeline } from "@/features/activities/activity-timeline";
 import { useContacts } from "@/features/contacts/api";
 import { ContactFormDialog } from "@/features/contacts/contact-form-dialog";
 import { ContactsTable } from "@/features/contacts/contacts-table";
@@ -158,6 +159,7 @@ export function AccountDetailView({ id }: { id: string }) {
           <AccountPipeline account={account} />
           <AccountContacts account={account} />
           <AccountOpportunities account={account} />
+          <ActivityTimeline className="mt-6" target={{ type: "account", id: account.id }} canLog={!account.archived} />
 
           <AccountFormDialog open={editing} onOpenChange={setEditing} account={account} />
         </>

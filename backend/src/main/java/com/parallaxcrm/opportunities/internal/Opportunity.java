@@ -6,6 +6,7 @@ import com.parallaxcrm.opportunities.OpportunityType;
 import com.parallaxcrm.shared.domain.AbstractEntity;
 import com.parallaxcrm.shared.domain.LeadSource;
 import com.parallaxcrm.shared.error.InvalidRequestException;
+import com.parallaxcrm.shared.error.WorkflowRuleException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -77,13 +78,47 @@ public class Opportunity extends AbstractEntity {
         // for JPA
     }
 
+    /** A new deal starts in the given stage (Prospecting when none is given), with that stage's probability. */
     public static Opportunity create(OpportunityInput input, UUID ownerId) {
         Opportunity opportunity = new Opportunity();
-        opportunity.update(input, ownerId);
+        opportunity.applyDetails(input, ownerId);
+        opportunity.moveTo(input.stage() != null ? input.stage() : OpportunityStage.PROSPECTING, input.probability());
         return opportunity;
     }
 
+    /**
+     * Edits the deal's details. The stage is not an editable field: it only changes through {@link #transitionTo}, so
+     * an edit can't skip the workflow. Sending the current stage back is accepted.
+     */
     public void update(OpportunityInput input, UUID ownerId) {
+        if (input.stage() != null && input.stage() != stage) {
+            throw new InvalidRequestException("stage", "Change the stage with a stage transition, not an edit.");
+        }
+        applyDetails(input, ownerId);
+        moveTo(stage, input.probability());
+    }
+
+    /**
+     * Moves the deal to another stage if the pipeline allows it (see {@link OpportunityStage}). The probability resets
+     * to the new stage's default: a stage change is a new assessment of the deal.
+     */
+    public void transitionTo(OpportunityStage next) {
+        if (next == null) {
+            throw new InvalidRequestException("toStage", "Choose a stage.");
+        }
+        if (next == stage) {
+            throw WorkflowRuleException.invalidTransition("This opportunity is already in %s.".formatted(stage.label()));
+        }
+        if (!stage.canTransitionTo(next)) {
+            String allowed = stage.allowedTransitions().stream().map(OpportunityStage::label)
+                    .collect(java.util.stream.Collectors.joining(", "));
+            throw WorkflowRuleException.invalidTransition(
+                    "An opportunity in %s can't move to %s. It can move to: %s.".formatted(stage.label(), next.label(), allowed));
+        }
+        moveTo(next, null);
+    }
+
+    private void applyDetails(OpportunityInput input, UUID ownerId) {
         if (input.accountId() == null) {
             throw new InvalidRequestException("accountId", "Choose an account.");
         }
@@ -96,7 +131,6 @@ public class Opportunity extends AbstractEntity {
         this.description = optional(input.description());
         this.nextStep = optional(input.nextStep());
         this.ownerId = ownerId;
-        moveTo(requiredValue("stage", input.stage()), input.probability());
     }
 
     /**

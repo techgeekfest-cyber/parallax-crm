@@ -48,20 +48,25 @@ test("account → contacts → opportunity, with primary contact and pipeline to
   await expect(pipeline.getByText("$50,000")).toBeVisible();
   await expect(pipeline.getByText("$25,000")).toBeVisible();
 
-  // Close it as won: the probability locks to 100% and the stage history records the move.
+  // Close it as won through the stage workflow: Proposal → Negotiation → Closed won. The edit form can't change stages.
   await page.getByRole("link", { name: `Platform rollout ${tag}` }).click();
   await expect(page.getByRole("heading", { name: `Platform rollout ${tag}`, level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Edit" }).click();
   dialog = page.getByRole("dialog", { name: "Edit opportunity" });
-  await choose(page, dialog, "Stage", "Closed won");
-  await expect(dialog.getByLabel("Probability (%)")).toBeDisabled();
-  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await expect(dialog.getByText("Change the stage with the stage controls on the opportunity.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Advance to Negotiation" }).click();
+  await expect(page.getByRole("region", { name: "Stage" }).locator("[aria-current=step]")).toHaveText("Negotiation");
+  await page.getByRole("button", { name: "Mark won" }).click();
+  dialog = page.getByRole("dialog", { name: "Mark this deal as won?" });
+  await dialog.getByRole("button", { name: "Mark won" }).click();
   await expect(dialog).toBeHidden();
 
   await page.reload();
-  await expect(page.getByText("100%", { exact: true })).toBeVisible();
+  await expect(page.getByText("100%", { exact: true }).first()).toBeVisible();
   const history = page.locator("[data-slot=card]").filter({ hasText: "Stage history" });
-  await expect(history.getByText("Created in")).toBeVisible();
+  await expect(history.getByText("Created", { exact: true })).toBeVisible();
+  await expect(history.getByText("from Negotiation")).toBeVisible();
   await expect(history.getByText("Closed won")).toBeVisible();
 
   // The contact page links back to the account.

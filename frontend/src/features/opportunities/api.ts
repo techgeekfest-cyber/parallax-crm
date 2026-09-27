@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { invalidateTimelines } from "@/features/activities/api";
 import { api, request } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
@@ -11,6 +12,8 @@ export type OpportunityRequest = components["schemas"]["OpportunityRequest"];
 export type PipelineSummary = components["schemas"]["PipelineSummaryResponse"];
 export type OpportunityStage = Opportunity["stage"];
 export type OpportunityType = NonNullable<Opportunity["type"]>;
+export type StageHistoryEntry = Opportunity["stageHistory"][number];
+export type StageTransition = { id: string; toStage: OpportunityStage; version: number; note?: string };
 
 export type OpportunityListParams = {
   q?: string;
@@ -66,8 +69,48 @@ function useOpportunityWrite<TVariables>(mutationFn: (variables: TVariables) => 
         queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() }),
         queryClient.invalidateQueries({ queryKey: opportunityKeys.summaries() }),
         queryClient.invalidateQueries({ queryKey: ["sales-reps"] }),
+        queryClient.invalidateQueries({ queryKey: ["pipeline"] }),
+        invalidateTimelines(queryClient),
       ]);
     },
+  });
+}
+
+/** Calls the stage-transition workflow endpoint. The server validates the move and the version. */
+export function transitionStage({ id, toStage, version, note }: StageTransition) {
+  return request(
+    api.POST("/api/v1/opportunities/{id}/stage-transitions", { params: { path: { id } }, body: { toStage, version, note } }),
+  );
+}
+
+/**
+ * Moves an opportunity from its detail page. The page shows the new stage immediately; the server's response then
+ * replaces it, and on any error (invalid move, conflict) the previous state comes back and the record is refetched.
+ */
+export function useTransitionStage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: transitionStage,
+    onMutate: async ({ id, toStage }) => {
+      const key = opportunityKeys.detail(id);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<Opportunity>(key);
+      if (previous) queryClient.setQueryData<Opportunity>(key, { ...previous, stage: toStage, allowedStages: [] });
+      return { previous };
+    },
+    onError: (_error, { id }, context) => {
+      if (context?.previous) queryClient.setQueryData(opportunityKeys.detail(id), context.previous);
+      return queryClient.invalidateQueries({ queryKey: opportunityKeys.detail(id) });
+    },
+    onSuccess: (opportunity) => queryClient.setQueryData(opportunityKeys.detail(opportunity.id), opportunity),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() }),
+        queryClient.invalidateQueries({ queryKey: opportunityKeys.summaries() }),
+        queryClient.invalidateQueries({ queryKey: ["pipeline"] }),
+        queryClient.invalidateQueries({ queryKey: ["sales-reps"] }),
+        invalidateTimelines(queryClient),
+      ]),
   });
 }
 

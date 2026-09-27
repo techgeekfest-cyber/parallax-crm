@@ -74,6 +74,16 @@ public class ContactService {
         return saved;
     }
 
+    /**
+     * For lead conversion: creates the contact under the same rules as {@link #create} (including authorisation), as
+     * part of the caller's transaction, and returns the public summary other modules may use.
+     */
+    @Transactional
+    public ContactSummary createFromLead(ContactInput input) {
+        Contact saved = create(input);
+        return new ContactSummary(saved.getId(), saved.getNumber(), saved.fullName(), saved.getAccountId());
+    }
+
     @Transactional
     public Contact update(UUID id, ContactInput input, long expectedVersion) {
         AuthenticatedUser actor = currentUser.require();
@@ -155,6 +165,16 @@ public class ContactService {
         return new RecordPermissions(
                 !contact.isArchived() && accessPolicy.canAccessRecordOwnedBy(actor, contact.getOwnerId()),
                 accessPolicy.canArchiveSalesRecords(actor));
+    }
+
+    /** For other modules. Does not authorise: contacts are readable by every signed-in user. */
+    public Map<UUID, ContactSummary> summaries(java.util.Collection<UUID> ids) {
+        var distinct = ids.stream().filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        if (distinct.isEmpty()) {
+            return Map.of();
+        }
+        return contacts.findAllById(distinct).stream().collect(java.util.stream.Collectors.toMap(Contact::getId,
+                c -> new ContactSummary(c.getId(), c.getNumber(), c.fullName(), c.getAccountId())));
     }
 
     private void requireUniqueEmail(String email, UUID contactId) {

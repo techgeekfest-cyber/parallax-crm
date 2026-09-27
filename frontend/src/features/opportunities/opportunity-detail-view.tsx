@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, PencilIcon, SearchXIcon } from "lucide-react";
+import { ArchiveIcon, ArrowLeftIcon, Building2Icon, FlagIcon, PencilIcon, SearchXIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -12,6 +12,10 @@ import { ErrorState } from "@/components/states/error-state";
 import { NoAccessState } from "@/components/states/no-access-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ACCOUNT_TYPE_LABELS } from "@/features/accounts/labels";
+import { ActivityTimeline } from "@/features/activities/activity-timeline";
+import { useContacts } from "@/features/contacts/api";
 import { LEAD_SOURCE_LABELS } from "@/features/leads/labels";
 import { describeError, isApiError } from "@/lib/api/errors";
 import { formatCalendarDate, formatCurrency, formatDateTime } from "@/lib/format";
@@ -20,6 +24,8 @@ import { useArchiveOpportunity, useOpportunity, type Opportunity } from "./api";
 import { OPPORTUNITY_TYPE_LABELS } from "./labels";
 import { OpportunityFormDialog } from "./opportunity-form-dialog";
 import { StageBadge } from "./stage-badge";
+import { StageControls } from "./stage-controls";
+import { StageHistory } from "./stage-history";
 
 export function OpportunityDetailView({ id }: { id: string }) {
   const { data: opportunity, error, isPending, refetch } = useOpportunity(id);
@@ -89,38 +95,59 @@ export function OpportunityDetailView({ id }: { id: string }) {
             </p>
           )}
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          {!opportunity.archived && (
+            <div className="mt-6">
+              <StageControls opportunity={opportunity} />
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-4">
             <Figure label="Amount" value={formatCurrency(opportunity.amount, { precise: true })} />
             <Figure label="Probability" value={`${opportunity.probability}%`} />
             <Figure label="Weighted" value={formatCurrency(opportunity.weightedAmount, { precise: true })} />
+            <Figure label="Expected close" value={formatCalendarDate(opportunity.closeDate)} />
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                  <DetailItem label="Expected close">{formatCalendarDate(opportunity.closeDate)}</DetailItem>
-                  <DetailItem label="Closed">{opportunity.closedAt ? formatDateTime(opportunity.closedAt) : <Empty label="Still open" />}</DetailItem>
-                  <DetailItem label="Type">{opportunity.type ? OPPORTUNITY_TYPE_LABELS[opportunity.type] : <Empty />}</DetailItem>
-                  <DetailItem label="Lead source">{opportunity.leadSource ? LEAD_SOURCE_LABELS[opportunity.leadSource] : <Empty />}</DetailItem>
-                  <DetailItem label="Owner">
-                    <OwnerName owner={opportunity.owner} />
-                  </DetailItem>
-                  <DetailItem label="Next step">{opportunity.nextStep ?? <Empty />}</DetailItem>
-                  <DetailItem label="Description" className="sm:col-span-2">
-                    {opportunity.description ? (
-                      <span className="block whitespace-pre-wrap">{opportunity.description}</span>
-                    ) : (
-                      <Empty label="No description" />
-                    )}
-                  </DetailItem>
-                </dl>
-              </CardContent>
-            </Card>
-            <StageHistory opportunity={opportunity} />
+            <div className="grid content-start gap-4 lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+                    <FlagIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Next step</p>
+                      <p className="text-sm">{opportunity.nextStep ?? <Empty label="No next step planned" />}</p>
+                    </div>
+                  </div>
+                  <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                    <DetailItem label="Closed">{opportunity.closedAt ? formatDateTime(opportunity.closedAt) : <Empty label="Still open" />}</DetailItem>
+                    <DetailItem label="Owner">
+                      <OwnerName owner={opportunity.owner} />
+                    </DetailItem>
+                    <DetailItem label="Type">{opportunity.type ? OPPORTUNITY_TYPE_LABELS[opportunity.type] : <Empty />}</DetailItem>
+                    <DetailItem label="Lead source">{opportunity.leadSource ? LEAD_SOURCE_LABELS[opportunity.leadSource] : <Empty />}</DetailItem>
+                    <DetailItem label="Description" className="sm:col-span-2">
+                      {opportunity.description ? (
+                        <span className="block whitespace-pre-wrap">{opportunity.description}</span>
+                      ) : (
+                        <Empty label="No description" />
+                      )}
+                    </DetailItem>
+                  </dl>
+                </CardContent>
+              </Card>
+              <ActivityTimeline
+                target={{ type: "opportunity", id: opportunity.id }}
+                canLog={!!opportunity.permissions.canEdit && !opportunity.archived}
+              />
+            </div>
+            <div className="grid content-start gap-4">
+              <RelatedAccount opportunity={opportunity} />
+              <StageHistory entries={opportunity.stageHistory} />
+            </div>
           </div>
 
           <OpportunityFormDialog open={editing} onOpenChange={setEditing} opportunity={opportunity} />
@@ -139,36 +166,50 @@ function Figure({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StageHistory({ opportunity }: { opportunity: Opportunity }) {
-  const entries = [...opportunity.stageHistory].reverse();
+/** The deal's account and the people there, so the next call is one click away. */
+function RelatedAccount({ opportunity }: { opportunity: Opportunity }) {
+  const contacts = useContacts({ accountId: opportunity.account.id, page: 0, size: 5, sort: "lastName,asc" });
+  const people = contacts.data?.content ?? [];
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Stage history</CardTitle>
+        <CardTitle>Account</CardTitle>
       </CardHeader>
-      <CardContent>
-        <ol className="relative grid gap-4 border-l pl-4">
-          {entries.map((entry, index) => (
-            <li key={`${entry.changedAt}-${index}`} className="relative">
-              <span className="absolute top-1.5 -left-[21px] size-2.5 rounded-full border-2 border-card bg-primary" aria-hidden="true" />
-              <div className="flex flex-wrap items-center gap-1.5">
-                {entry.fromStage ? (
-                  <>
-                    <StageBadge stage={entry.fromStage} />
-                    <ArrowRightIcon className="size-3 text-muted-foreground" aria-label="to" />
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Created in</span>
-                )}
-                <StageBadge stage={entry.toStage} />
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {formatCurrency(entry.amount)} at {entry.probability}% · {entry.changedBy?.fullName ?? "System"} ·{" "}
-                {formatDateTime(entry.changedAt)}
-              </p>
-            </li>
-          ))}
-        </ol>
+      <CardContent className="grid gap-4">
+        <Link href={`/accounts/${opportunity.account.id}`} className="group flex items-center gap-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+            <Building2Icon className="size-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium group-hover:text-primary group-hover:underline">{opportunity.account.name}</span>
+            <span className="block text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[opportunity.account.type]}</span>
+          </span>
+        </Link>
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">Contacts</p>
+          {contacts.isPending ? (
+            <Skeleton className="mt-2 h-10 w-full" />
+          ) : people.length === 0 ? (
+            <p className="mt-1 text-sm text-muted-foreground">No contacts at this account yet.</p>
+          ) : (
+            <ul className="mt-1.5 grid gap-2" aria-label="Contacts at this account">
+              {people.map((contact) => (
+                <li key={contact.id} className="min-w-0 text-sm">
+                  <Link href={`/contacts/${contact.id}`} className="font-medium hover:text-primary hover:underline">
+                    {contact.fullName}
+                  </Link>
+                  {contact.primary && <span className="ml-1.5 text-xs text-primary">Primary</span>}
+                  <span className="block truncate text-xs text-muted-foreground">{[contact.title, contact.email].filter(Boolean).join(" · ") || "No title or email"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {(contacts.data?.totalElements ?? 0) > people.length && (
+            <Link href={`/accounts/${opportunity.account.id}`} className="mt-2 inline-block text-xs text-primary hover:underline">
+              All {contacts.data?.totalElements} contacts
+            </Link>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

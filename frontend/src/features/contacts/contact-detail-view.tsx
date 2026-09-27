@@ -12,6 +12,7 @@ import { ErrorState } from "@/components/states/error-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccountTypeBadge } from "@/features/accounts/account-badges";
+import { ActivityTimeline } from "@/features/activities/activity-timeline";
 import { describeError, isApiError } from "@/lib/api/errors";
 import { formatDateTime } from "@/lib/format";
 
@@ -149,6 +150,8 @@ export function ContactDetailView({ id }: { id: string }) {
               </Card>
             </div>
           </div>
+
+          <ActivityTimeline className="mt-4" target={{ type: "contact", id: contact.id }} canLog={!contact.archived} />
 
           <ContactFormDialog open={editing} onOpenChange={setEditing} contact={contact} />
         </>
