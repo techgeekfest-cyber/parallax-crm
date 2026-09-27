@@ -2,11 +2,17 @@ package com.parallaxcrm.identity;
 
 import com.parallaxcrm.identity.internal.User;
 import com.parallaxcrm.identity.internal.UserRepository;
+import com.parallaxcrm.identity.internal.UserSpecifications;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.parallaxcrm.shared.error.InvalidRequestException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -33,6 +39,17 @@ public class UserDirectory {
         return users.findAllById(distinct).stream()
                 .map(User::toSummary)
                 .collect(Collectors.toMap(UserSummary::id, Function.identity()));
+    }
+
+    /** People who carry a quota: sales reps and sales managers. */
+    public static final Set<Role> SALES_ROLES = EnumSet.of(Role.SALES_REP, Role.SALES_MANAGER);
+
+    public Page<DirectoryEntry> salesPeople(String query, Boolean active, Pageable pageable) {
+        return users.findAll(UserSpecifications.matching(query, SALES_ROLES, active), pageable).map(User::toDirectoryEntry);
+    }
+
+    public Optional<DirectoryEntry> find(UUID id) {
+        return users.findById(id).map(User::toDirectoryEntry);
     }
 
     /** Records can only be assigned to active users. */

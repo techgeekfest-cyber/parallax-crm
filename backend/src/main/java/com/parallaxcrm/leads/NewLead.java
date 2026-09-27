@@ -1,5 +1,6 @@
 package com.parallaxcrm.leads;
 
+import com.parallaxcrm.shared.domain.LeadSource;
 import java.math.BigDecimal;
 import java.util.UUID;
 

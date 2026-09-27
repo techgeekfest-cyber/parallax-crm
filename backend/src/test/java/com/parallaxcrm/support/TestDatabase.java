@@ -12,7 +12,10 @@ public class TestDatabase {
     }
 
     public void reset() {
-        jdbc.execute("truncate table leads, audit_events, spring_session, users cascade");
+        jdbc.execute("""
+                truncate table leads, opportunity_stage_history, opportunities, contacts, enterprise_subsidiaries,
+                    enterprise_accounts, smb_accounts, startup_accounts, accounts, sales_reps, activities, audit_events,
+                    spring_session, users cascade""");
     }
 
     public int count(String sql, Object... args) {

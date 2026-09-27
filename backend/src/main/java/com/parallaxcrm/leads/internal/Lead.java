@@ -1,6 +1,6 @@
 package com.parallaxcrm.leads.internal;
 
-import com.parallaxcrm.leads.LeadSource;
+import com.parallaxcrm.shared.domain.LeadSource;
 import com.parallaxcrm.leads.LeadStatus;
 import com.parallaxcrm.shared.domain.AbstractEntity;
 import com.parallaxcrm.shared.error.InvalidRequestException;

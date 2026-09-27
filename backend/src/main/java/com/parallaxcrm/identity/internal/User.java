@@ -1,6 +1,7 @@
 package com.parallaxcrm.identity.internal;
 
 import com.parallaxcrm.identity.AuthenticatedUser;
+import com.parallaxcrm.identity.DirectoryEntry;
 import com.parallaxcrm.identity.Role;
 import com.parallaxcrm.identity.UserSummary;
 import com.parallaxcrm.shared.domain.AbstractEntity;
@@ -85,6 +86,10 @@ public class User extends AbstractEntity {
 
     public AuthenticatedUser toAuthenticatedUser() {
         return new AuthenticatedUser(getId(), email, firstName, lastName, role);
+    }
+
+    public DirectoryEntry toDirectoryEntry() {
+        return new DirectoryEntry(getId(), email, firstName, lastName, role, active);
     }
 
     public UserSummary toSummary() {

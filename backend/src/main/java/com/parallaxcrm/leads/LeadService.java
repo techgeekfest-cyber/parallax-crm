@@ -93,6 +93,16 @@ public class LeadService {
         return leads.findAll(LeadSpecifications.matching(query, statuses, effectiveOwner), pageable);
     }
 
+    /** Open (not converted, not disqualified, not archived) leads per owner, for the sales team view. Not authorised. */
+    public Map<UUID, Long> countOpenByOwner(Collection<UUID> ownerIds) {
+        if (ownerIds.isEmpty()) {
+            return Map.of();
+        }
+        return leads.countOpenByOwner(ownerIds).stream()
+                .collect(java.util.stream.Collectors.toMap(LeadRepository.OwnerCount::getOwnerId,
+                        LeadRepository.OwnerCount::getTotal));
+    }
+
     private static Map<String, Object> snapshot(Lead lead) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("number", lead.getNumber());

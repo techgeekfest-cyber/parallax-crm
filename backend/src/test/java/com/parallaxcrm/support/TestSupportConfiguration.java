@@ -15,6 +15,11 @@ public class TestSupportConfiguration {
     }
 
     @Bean
+    Api api(org.springframework.test.web.servlet.assertj.MockMvcTester mvc, tools.jackson.databind.json.JsonMapper json) {
+        return new Api(mvc, json);
+    }
+
+    @Bean
     TestDatabase testDatabase(JdbcTemplate jdbc) {
         return new TestDatabase(jdbc);
     }

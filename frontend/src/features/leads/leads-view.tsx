@@ -1,25 +1,15 @@
 "use client";
 
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsUpDownIcon,
-  PlusIcon,
-  SearchIcon,
-  SearchXIcon,
-  UsersRoundIcon,
-} from "lucide-react";
+import { PlusIcon, SearchXIcon, UsersRoundIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import { Pagination, SearchInput, SortableHead } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,7 +30,6 @@ const ALL_STATUSES = "ALL";
 const ALL_OWNERS = "ALL";
 const STATUS_FILTER_ITEMS = { [ALL_STATUSES]: "All statuses", ...LEAD_STATUS_LABELS };
 
-type SortField = "lastName" | "company" | "status" | "estimatedValue" | "createdAt";
 
 /**
  * List state lives in the URL, so views are shareable and survive refresh and the back button. Updates use the native
@@ -119,7 +108,12 @@ export function LeadsView() {
       />
 
       <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <SearchBox value={params.q ?? ""} onChange={(value) => update({ q: value || undefined })} />
+        <SearchInput
+          label="Search leads"
+          placeholder="Search name, company, email…"
+          value={params.q ?? ""}
+          onChange={(value) => update({ q: value || undefined })}
+        />
         <Select
           items={STATUS_FILTER_ITEMS}
           value={params.status ?? ALL_STATUSES}
@@ -189,16 +183,18 @@ export function LeadsView() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <SortableHead field="lastName" label="Lead" sort={params.sort} onSort={(sort) => update({ sort })} />
+                <SortableHead defaultSort="createdAt,desc" field="lastName" label="Lead" sort={params.sort} onSort={(sort) => update({ sort })} />
                 <SortableHead
+                  defaultSort="createdAt,desc"
                   field="company"
                   label="Company"
                   className="hidden sm:table-cell"
                   sort={params.sort}
                   onSort={(sort) => update({ sort })}
                 />
-                <SortableHead field="status" label="Status" sort={params.sort} onSort={(sort) => update({ sort })} />
+                <SortableHead defaultSort="createdAt,desc" field="status" label="Status" sort={params.sort} onSort={(sort) => update({ sort })} />
                 <SortableHead
+                  defaultSort="createdAt,desc"
                   field="estimatedValue"
                   label="Est. value"
                   align="right"
@@ -209,6 +205,7 @@ export function LeadsView() {
                 {seesAll && <TableHead className="hidden lg:table-cell">Sales rep</TableHead>}
                 <TableHead className="hidden 2xl:table-cell">Source</TableHead>
                 <SortableHead
+                  defaultSort="createdAt,desc"
                   field="createdAt"
                   label="Created"
                   className="hidden md:table-cell"
@@ -282,63 +279,6 @@ export function LeadsView() {
   );
 }
 
-function SearchBox({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="relative w-full sm:max-w-xs">
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        type="search"
-        aria-label="Search leads"
-        placeholder="Search name, company, email…"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="pl-8"
-      />
-    </div>
-  );
-}
-
-function SortableHead({
-  field,
-  label,
-  sort,
-  onSort,
-  align = "left",
-  className,
-}: {
-  field: SortField;
-  label: string;
-  sort?: string;
-  onSort: (sort: string | undefined) => void;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  const [sortField, direction] = (sort ?? "createdAt,desc").split(",");
-  const active = sortField === field;
-  const Icon = !active ? ChevronsUpDownIcon : direction === "desc" ? ArrowDownIcon : ArrowUpIcon;
-  // Cycle: ascending → descending → back to the default order.
-  const next = !active ? `${field},asc` : direction === "desc" ? undefined : `${field},desc`;
-
-  return (
-    <TableHead
-      className={cn(align === "right" && "text-right", className)}
-      aria-sort={active ? (direction === "desc" ? "descending" : "ascending") : undefined}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(next)}
-        className={cn(
-          "-mx-1 inline-flex items-center gap-1 rounded px-1 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-          active && "text-foreground",
-        )}
-      >
-        {label}
-        <Icon className={cn("size-3.5", !active && "opacity-40")} />
-      </button>
-    </TableHead>
-  );
-}
-
 function SkeletonRow({ withOwner }: { withOwner: boolean }) {
   return (
     <TableRow>
@@ -367,42 +307,5 @@ function SkeletonRow({ withOwner }: { withOwner: boolean }) {
         <Skeleton className="h-4 w-24" />
       </TableCell>
     </TableRow>
-  );
-}
-
-function Pagination({
-  page,
-  size,
-  totalElements,
-  totalPages,
-  onPage,
-}: {
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  onPage: (page: number) => void;
-}) {
-  const from = page * size + 1;
-  const to = Math.min(totalElements, (page + 1) * size);
-  return (
-    <nav aria-label="Pagination" className="flex items-center justify-between border-t px-4 py-3 text-sm">
-      <p className="text-muted-foreground">
-        <span className="tabular-nums">
-          {from}–{to}
-        </span>{" "}
-        of <span className="tabular-nums">{totalElements.toLocaleString("en-US")}</span>
-      </p>
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="sm" disabled={page === 0} onClick={() => onPage(page - 1)}>
-          <ChevronLeftIcon data-icon="inline-start" />
-          Previous
-        </Button>
-        <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => onPage(page + 1)}>
-          Next
-          <ChevronRightIcon data-icon="inline-end" />
-        </Button>
-      </div>
-    </nav>
   );
 }
