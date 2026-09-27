@@ -45,10 +45,10 @@ top-level package is its public API, and sub-packages are internal. Boundaries a
 | `leads` | Lead lifecycle and ownership; later conversion workflow | A0–A1 (create/read/list, owner scoping) |
 | `audit` | Immutable change log, written synchronously in the same transaction as the change | A0 (write path) |
 | `identity` | Users, sign-in, database-backed sessions, roles, `AccessPolicy`, user administration | A1 |
-| `salesteam` | Sales rep profiles, quotas, territories | A2 |
-| `accounts` | Account hierarchy (Enterprise / SMB / Startup) | A2 |
-| `contacts` | Contacts | A2 |
-| `opportunities` | Pipeline, stage machine, stage history | A2–A3 |
+| `salesteam` | Sales profiles (territory, title, quota) of users with a sales role, plus live figures (YTD sales, attainment, pipeline) computed from owned records | A2 |
+| `accounts` | Account hierarchy (Enterprise / SMB / Startup) with per-subtype tier and support rules | A2 |
+| `contacts` | People at accounts; one primary contact per account | A2 |
+| `opportunities` | Deals on accounts, pipeline totals, stage history (transition workflow and Kanban in A3) | A2 |
 | `activities` | User-facing timeline | B1 |
 | `search`, `analytics` | Read-only cross-entity queries | B2, A4 |
 | `intelligence` | Scoring, risk, recommendations — listens to events, core never depends on it | C |
@@ -70,7 +70,21 @@ construction goes through factory methods that validate input, state changes go 
 (`lead.convert(...)`, `opportunity.moveTo(stage)`), and there are no public setters for invariant-protected state.
 
 The account hierarchy uses JPA `JOINED` inheritance (`accounts` + `enterprise_accounts` / `smb_accounts` /
-`startup_accounts`), with polymorphic behaviour such as `tier()` and `supportLevel()` overridden per subtype.
+`startup_accounts`). Each subtype derives its own `tier()` and `supportLevel()` from its own attributes:
+
+| Subtype | Tier | Support |
+|---|---|---|
+| `EnterpriseAccount` | `STRATEGIC` from $1B revenue or 10,000 global employees, else `MAJOR` | `DEDICATED` with an enterprise support contract, else `PRIORITY` |
+| `SmbAccount` | `ESTABLISHED` after 5 years in business, else `EMERGING` | `STANDARD` |
+| `StartupAccount` | By funding round: `EARLY_STAGE` (to seed), `GROWTH_STAGE` (A–B), `LATE_STAGE` (C+) | `PRIORITY` when late stage, else `STANDARD` |
+
+An account's type is fixed at creation. Opportunities derive probability from their stage (overridable while open,
+forced to 100/0 when closed) and record every stage they enter in `opportunity_stage_history`, in the same transaction.
+
+**Cross-module composition.** `contacts`, `opportunities` and `salesteam` depend on `accounts` (and `salesteam` on
+`leads` and `opportunities` for its figures); nothing depends back on them. The account page is therefore composed by
+the frontend from `GET /accounts/{id}`, `GET /contacts?accountId=`, `GET /opportunities?accountId=` and
+`GET /opportunities/summary?accountId=` rather than by an account endpoint reaching into other modules.
 
 ### Errors
 
@@ -114,7 +128,8 @@ Conventions:
 - `pg_trgm` GIN indexes for search on names, companies and emails.
 - Derived values (YTD sales, attainment, pipeline totals) are computed by queries, not stored.
 
-V1 creates the full core relational model — users, sales reps, the account hierarchy, contacts, leads, opportunities,
+V3 (A2) makes every contact belong to an account, lets the database assign subsidiary row ids, and adds CHECK
+constraints for opportunity lead sources and stage-history stages. V1 creates the full core relational model — users, sales reps, the account hierarchy, contacts, leads, opportunities,
 stage history, activities and audit events — so cross-entity foreign keys exist from the start. Framework tables
 (Spring Session, event publication) arrive with the phases that need them.
 
@@ -167,10 +182,18 @@ fetches `GET /api/v1/auth/csrf` when the cookie is missing (for example right af
 
 | Capability | ADMIN | SALES_MANAGER | SALES_REP |
 |---|---|---|---|
-| See / work leads owned by others | ✓ | ✓ (organisation-wide until teams exist in A2) | — |
-| Assign leads to other people | ✓ | ✓ | — (always the owner of what they create) |
+| Leads and opportunities: see and work others' | ✓ | ✓ | — (own only; asking for others' is a 403) |
+| Accounts and contacts: read | ✓ | ✓ | ✓ (shared reference data) |
+| Accounts and contacts: edit | ✓ | ✓ | Own records only |
+| Assign any record to other people | ✓ | ✓ | — (always the owner of what they create) |
+| Archive / restore accounts, contacts, opportunities | ✓ | ✓ | — |
+| Sales profiles (territory, quota) | ✓ edit | ✓ edit | Own profile, read-only |
 | View the user directory | ✓ | ✓ | — |
-| Create users, change roles, deactivate | ✓ | — | — |
+| Create users (including sales reps), change roles, deactivate | ✓ | — | — |
+
+Sales managers have organisation-wide scope. Team-scoped managers were considered and deliberately not built: the
+permission model stays one rule per record type ([ADR 0007](adr/0007-record-visibility.md)). Pipeline totals and
+account opportunity lists respect the same visibility, so a rep's figures only ever include their own deals.
 
 Admins cannot change their own role or deactivate themselves, so an organisation always keeps an active admin.
 
@@ -196,9 +219,9 @@ Configuration is provider-agnostic ([ADR 0003](adr/0003-postgresql-neon-provider
 
 | Phase | Scope |
 |---|---|
-| **A0** | Foundations + Lead vertical slice (PostgreSQL → API → UI), CI, Docker, health checks |
-| A1 | Authentication, roles, access policy |
-| A2 | Sales reps, accounts, contacts, opportunities, full lead CRUD, archive/restore |
+| **A0** ✅ | Foundations + Lead vertical slice (PostgreSQL → API → UI), CI, Docker, health checks |
+| **A1** ✅ | Authentication, roles, access policy |
+| **A2** ✅ | Sales reps, account hierarchy, contacts, opportunities: CRUD, archive/restore, search, filters, permissions |
 | A3 | Lead conversion, opportunity stage machine + history, Kanban, conflict handling |
 | A4 | Live dashboard and analytics queries |
 | B | Activity timeline, audit viewer, command palette + search, CSV import/export, polish |

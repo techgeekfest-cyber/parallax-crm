@@ -28,6 +28,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-reps/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a sales rep
+         * @description Reps may only open their own profile.
+         */
+        get: operations["get_1"];
+        /**
+         * Update a sales profile
+         * @description Managers and admins: title, territory, quota…
+         */
+        put: operations["update_1"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an opportunity, with its stage history */
+        get: operations["get_2"];
+        /**
+         * Update an opportunity
+         * @description Owner, managers and admins. Requires the loaded version.
+         */
+        put: operations["update_2"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a contact */
+        get: operations["get_3"];
+        /**
+         * Update a contact
+         * @description Owner, managers and admins. Requires the loaded version.
+         */
+        put: operations["update_3"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password": {
         parameters: {
             query?: never;
@@ -41,6 +107,27 @@ export interface paths {
          * @description Signs you out of every other session.
          */
         put: operations["changePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an account */
+        get: operations["get_4"];
+        /**
+         * Update an account
+         * @description Owner, managers and admins. Requires the loaded version.
+         */
+        put: operations["update_4"];
         post?: never;
         delete?: never;
         options?: never;
@@ -72,6 +159,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-reps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sales reps with performance figures
+         * @description Managers and admins see the whole team; reps see only themselves.
+         */
+        get: operations["list_1"];
+        put?: never;
+        /**
+         * Create a sales rep
+         * @description Admins only. Creates the sign-in account and profile.
+         */
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List opportunities
+         * @description Reps see only their own opportunities.
+         */
+        get: operations["list_2"];
+        put?: never;
+        /** Create an opportunity */
+        post: operations["create_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived opportunity
+         * @description Managers and admins.
+         */
+        post: operations["restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive an opportunity
+         * @description Managers and admins.
+         */
+        post: operations["archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads": {
         parameters: {
             query?: never;
@@ -83,10 +255,71 @@ export interface paths {
          * List leads
          * @description Paginated, searchable list of active (non-archived) leads.
          */
-        get: operations["list_1"];
+        get: operations["list_3"];
         put?: never;
         /** Create a lead */
-        post: operations["create_1"];
+        post: operations["create_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List contacts
+         * @description Every signed-in user can browse contacts.
+         */
+        get: operations["list_4"];
+        put?: never;
+        /** Create a contact */
+        post: operations["create_4"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived contact
+         * @description Managers and admins.
+         */
+        post: operations["restore_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a contact
+         * @description Managers and admins. An archived contact stops being primary.
+         */
+        post: operations["archive_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -113,6 +346,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List accounts
+         * @description Every signed-in user can browse accounts.
+         */
+        get: operations["list_5"];
+        put?: never;
+        /** Create an account */
+        post: operations["create_5"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounts/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived account
+         * @description Managers and admins.
+         */
+        post: operations["restore_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounts/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive an account
+         * @description Managers and admins.
+         */
+        post: operations["archive_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pipeline totals
+         * @description Open, weighted and won totals over the opportunities you can see (reps: their own).
+         */
+        get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads/{id}": {
         parameters: {
             query?: never;
@@ -121,7 +435,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get a lead */
-        get: operations["get_1"];
+        get: operations["get_5"];
         put?: never;
         post?: never;
         delete?: never;
@@ -197,9 +511,290 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        SalesProfileRequest: {
+            title?: string;
+            department?: string;
+            phone?: string;
+            territory?: string;
+            quota: number;
+            /**
+             * Format: int64
+             * @description profileVersion from the loaded rep (0 if they have no profile yet).
+             */
+            version: number;
+        };
+        SalesRepResponse: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            fullName: string;
+            /** @enum {string} */
+            role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+            active: boolean;
+            title?: string;
+            department?: string;
+            phone?: string;
+            territory?: string;
+            quota: number;
+            ytdSales: number;
+            attainmentPercent?: number;
+            /** Format: int64 */
+            openLeadCount: number;
+            /** Format: int64 */
+            accountCount: number;
+            /** Format: int64 */
+            openOpportunityCount: number;
+            openPipeline: number;
+            weightedPipeline: number;
+            /** Format: int64 */
+            profileVersion: number;
+            canEdit: boolean;
+        };
+        OpportunityRequest: {
+            /** Format: uuid */
+            accountId: string;
+            name: string;
+            amount: number;
+            /** @enum {string} */
+            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /**
+             * Format: int32
+             * @description 0–100. Omit to use the stage's default. Closed stages are always 100 (won) or 0 (lost).
+             */
+            probability?: number;
+            /** Format: date */
+            closeDate: string;
+            /** @enum {string} */
+            type?: "NEW_BUSINESS" | "EXISTING_BUSINESS" | "RENEWAL" | "UPSELL";
+            /** @enum {string} */
+            leadSource?: "WEB" | "REFERRAL" | "EVENT" | "PARTNER" | "OUTBOUND" | "ADVERTISING" | "OTHER";
+            description?: string;
+            nextStep?: string;
+            /**
+             * Format: uuid
+             * @description Owner; defaults to you on create and is unchanged on update when omitted.
+             */
+            ownerId?: string;
+            /**
+             * Format: int64
+             * @description Required on update (optimistic locking).
+             */
+            version?: number;
+        };
+        AccountRefResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            type: "ENTERPRISE" | "SMB" | "STARTUP";
+            archived: boolean;
+        };
+        OpportunityResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            name: string;
+            account: components["schemas"]["AccountRefResponse"];
+            amount: number;
+            /** @enum {string} */
+            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** Format: int32 */
+            probability: number;
+            weightedAmount: number;
+            /** Format: date */
+            closeDate: string;
+            /** @enum {string} */
+            type?: "NEW_BUSINESS" | "EXISTING_BUSINESS" | "RENEWAL" | "UPSELL";
+            /** @enum {string} */
+            leadSource?: "WEB" | "REFERRAL" | "EVENT" | "PARTNER" | "OUTBOUND" | "ADVERTISING" | "OTHER";
+            description?: string;
+            nextStep?: string;
+            owner?: components["schemas"]["UserRefResponse"];
+            /** Format: date-time */
+            closedAt?: string;
+            stageHistory: components["schemas"]["StageHistoryResponse"][];
+            archived: boolean;
+            /** Format: date-time */
+            archivedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int64 */
+            version: number;
+            permissions: components["schemas"]["RecordPermissions"];
+        };
+        RecordPermissions: {
+            canEdit?: boolean;
+            canArchive?: boolean;
+        };
+        StageHistoryResponse: {
+            /** @enum {string} */
+            fromStage?: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** @enum {string} */
+            toStage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            amount: number;
+            /** Format: int32 */
+            probability: number;
+            changedBy?: components["schemas"]["UserRefResponse"];
+            /** Format: date-time */
+            changedAt: string;
+        };
+        UserRefResponse: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            active: boolean;
+        };
+        AddressDto: {
+            street?: string;
+            city?: string;
+            state?: string;
+            postalCode?: string;
+            country?: string;
+        };
+        ContactRequest: {
+            /** Format: uuid */
+            accountId: string;
+            firstName: string;
+            lastName: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+            title?: string;
+            department?: string;
+            /** @description Making a contact primary demotes the account's current primary contact. */
+            primary?: boolean;
+            mailingAddress?: components["schemas"]["AddressDto"];
+            /**
+             * Format: uuid
+             * @description Owner; defaults to you on create and is unchanged on update when omitted.
+             */
+            ownerId?: string;
+            /**
+             * Format: int64
+             * @description Required on update (optimistic locking).
+             */
+            version?: number;
+        };
+        ContactResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            account: components["schemas"]["AccountRefResponse"];
+            firstName: string;
+            lastName: string;
+            fullName: string;
+            email?: string;
+            phone?: string;
+            title?: string;
+            department?: string;
+            primary: boolean;
+            mailingAddress: components["schemas"]["AddressDto"];
+            owner?: components["schemas"]["UserRefResponse"];
+            archived: boolean;
+            /** Format: date-time */
+            archivedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int64 */
+            version: number;
+            permissions: components["schemas"]["RecordPermissions"];
+        };
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        AccountRequest: {
+            /** @enum {string} */
+            type: "ENTERPRISE" | "SMB" | "STARTUP";
+            name: string;
+            website?: string;
+            phone?: string;
+            industry?: string;
+            /** Format: int32 */
+            employeeCount?: number;
+            annualRevenue?: number;
+            billingAddress?: components["schemas"]["AddressDto"];
+            shippingAddress?: components["schemas"]["AddressDto"];
+            /**
+             * Format: uuid
+             * @description Owner; defaults to you on create and is unchanged on update when omitted.
+             */
+            ownerId?: string;
+            enterprise?: components["schemas"]["EnterpriseProfile"];
+            smb?: components["schemas"]["SmbProfile"];
+            startup?: components["schemas"]["StartupProfile"];
+            /**
+             * Format: int64
+             * @description Required on update (optimistic locking).
+             */
+            version?: number;
+        };
+        EnterpriseProfile: {
+            enterpriseId?: string;
+            /** Format: int32 */
+            globalEmployeeCount?: number;
+            subsidiaries?: string[];
+            /** Format: uuid */
+            accountManagerId?: string;
+            hasEnterpriseSupport?: boolean;
+        };
+        SmbProfile: {
+            businessType?: string;
+            /** Format: int32 */
+            yearsInBusiness?: number;
+            ownerName?: string;
+            localBusiness?: boolean;
+        };
+        StartupProfile: {
+            /** @enum {string} */
+            fundingRound?: "BOOTSTRAPPED" | "PRE_SEED" | "SEED" | "SERIES_A" | "SERIES_B" | "SERIES_C" | "SERIES_D_PLUS";
+            totalFunding?: number;
+            investorType?: string;
+            /** Format: int32 */
+            monthsToProfitability?: number;
+            /** @enum {string} */
+            growthStage?: "IDEA" | "MVP" | "EARLY_TRACTION" | "GROWTH" | "SCALE";
+        };
+        AccountResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            /** @enum {string} */
+            type: "ENTERPRISE" | "SMB" | "STARTUP";
+            /** @enum {string} */
+            tier: "STRATEGIC" | "MAJOR" | "ESTABLISHED" | "EMERGING" | "EARLY_STAGE" | "GROWTH_STAGE" | "LATE_STAGE";
+            /** @enum {string} */
+            supportLevel: "DEDICATED" | "PRIORITY" | "STANDARD";
+            name: string;
+            website?: string;
+            phone?: string;
+            industry?: string;
+            /** Format: int32 */
+            employeeCount?: number;
+            annualRevenue?: number;
+            billingAddress: components["schemas"]["AddressDto"];
+            shippingAddress: components["schemas"]["AddressDto"];
+            owner?: components["schemas"]["UserRefResponse"];
+            enterprise?: components["schemas"]["EnterpriseProfile"];
+            accountManager?: components["schemas"]["UserRefResponse"];
+            smb?: components["schemas"]["SmbProfile"];
+            startup?: components["schemas"]["StartupProfile"];
+            archived: boolean;
+            /** Format: date-time */
+            archivedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int64 */
+            version: number;
+            permissions: components["schemas"]["RecordPermissions"];
         };
         CreateUserRequest: {
             /** Format: email */
@@ -209,6 +804,23 @@ export interface components {
             /** @enum {string} */
             role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
             password: string;
+        };
+        CreateSalesRepRequest: {
+            /** Format: email */
+            email: string;
+            firstName: string;
+            lastName: string;
+            /**
+             * @description SALES_REP or SALES_MANAGER
+             * @enum {string}
+             */
+            role: "ADMIN" | "SALES_MANAGER" | "SALES_REP";
+            password: string;
+            title?: string;
+            department?: string;
+            phone?: string;
+            territory?: string;
+            quota?: number;
         };
         CreateLeadRequest: {
             firstName: string;
@@ -288,6 +900,57 @@ export interface components {
             /** Format: int32 */
             totalPages: number;
         };
+        PageResponseSalesRepResponse: {
+            content: components["schemas"]["SalesRepResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        OpportunitySummaryResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            name: string;
+            account: components["schemas"]["AccountRefResponse"];
+            amount: number;
+            /** @enum {string} */
+            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** Format: int32 */
+            probability: number;
+            /** Format: date */
+            closeDate: string;
+            owner?: components["schemas"]["UserRefResponse"];
+            archived: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PageResponseOpportunitySummaryResponse: {
+            content: components["schemas"]["OpportunitySummaryResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PipelineSummaryResponse: {
+            /** Format: int64 */
+            openCount: number;
+            openAmount: number;
+            weightedAmount: number;
+            /** Format: int64 */
+            wonCount: number;
+            wonAmount: number;
+            /** Format: int64 */
+            lostCount: number;
+        };
         LeadSummaryResponse: {
             /** Format: uuid */
             id: string;
@@ -306,6 +969,62 @@ export interface components {
         };
         PageResponseLeadSummaryResponse: {
             content: components["schemas"]["LeadSummaryResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        ContactSummaryResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            fullName: string;
+            email?: string;
+            phone?: string;
+            title?: string;
+            primary: boolean;
+            account: components["schemas"]["AccountRefResponse"];
+            owner?: components["schemas"]["UserRefResponse"];
+            archived: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PageResponseContactSummaryResponse: {
+            content: components["schemas"]["ContactSummaryResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        AccountSummaryResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            name: string;
+            /** @enum {string} */
+            type: "ENTERPRISE" | "SMB" | "STARTUP";
+            /** @enum {string} */
+            tier: "STRATEGIC" | "MAJOR" | "ESTABLISHED" | "EMERGING" | "EARLY_STAGE" | "GROWTH_STAGE" | "LATE_STAGE";
+            industry?: string;
+            website?: string;
+            /** Format: int32 */
+            employeeCount?: number;
+            annualRevenue?: number;
+            owner?: components["schemas"]["UserRefResponse"];
+            archived: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PageResponseAccountSummaryResponse: {
+            content: components["schemas"]["AccountSummaryResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -372,6 +1091,150 @@ export interface operations {
             };
         };
     };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepResponse"];
+                };
+            };
+        };
+    };
+    update_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepResponse"];
+                };
+            };
+        };
+    };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityResponse"];
+                };
+            };
+        };
+    };
+    update_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpportunityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityResponse"];
+                };
+            };
+        };
+    };
+    get_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactResponse"];
+                };
+            };
+        };
+    };
+    update_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactResponse"];
+                };
+            };
+        };
+    };
     changePassword: {
         parameters: {
             query?: never;
@@ -391,6 +1254,54 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+        };
+    };
+    update_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
             };
         };
     };
@@ -448,6 +1359,156 @@ export interface operations {
     list_1: {
         parameters: {
             query?: {
+                q?: string;
+                active?: boolean;
+                page?: number;
+                size?: number;
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseSalesRepResponse"];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSalesRepRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepResponse"];
+                };
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: {
+                /** @description Matches name or opportunity number */
+                q?: string;
+                stage?: ("PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST")[];
+                accountId?: string;
+                /** @description Only this owner's opportunities. Reps may only pass their own id. */
+                ownerId?: string;
+                archived?: boolean;
+                page?: number;
+                size?: number;
+                /** @description field[,asc|desc]; sortable: name, amount, probability, closeDate, createdAt, updatedAt, number */
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseOpportunitySummaryResponse"];
+                };
+            };
+        };
+    };
+    create_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpportunityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityResponse"];
+                };
+            };
+        };
+    };
+    restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityResponse"];
+                };
+            };
+        };
+    };
+    archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityResponse"];
+                };
+            };
+        };
+    };
+    list_3: {
+        parameters: {
+            query?: {
                 /** @description Matches name, company, email or lead number */
                 q?: string;
                 status?: ("NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED")[];
@@ -475,7 +1536,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -495,6 +1556,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeadResponse"];
+                };
+            };
+        };
+    };
+    list_4: {
+        parameters: {
+            query?: {
+                /** @description Matches name, email, title or contact number */
+                q?: string;
+                accountId?: string;
+                ownerId?: string;
+                archived?: boolean;
+                page?: number;
+                size?: number;
+                /** @description field[,asc|desc]; sortable: lastName, title, createdAt, updatedAt, number */
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseContactSummaryResponse"];
+                };
+            };
+        };
+    };
+    create_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactResponse"];
+                };
+            };
+        };
+    };
+    restore_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactResponse"];
+                };
+            };
+        };
+    };
+    archive_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactResponse"];
                 };
             };
         };
@@ -523,7 +1682,129 @@ export interface operations {
             };
         };
     };
-    get_1: {
+    list_5: {
+        parameters: {
+            query?: {
+                /** @description Matches name, website, industry or account number */
+                q?: string;
+                type?: "ENTERPRISE" | "SMB" | "STARTUP";
+                ownerId?: string;
+                /** @description true lists archived accounts instead of active ones */
+                archived?: boolean;
+                page?: number;
+                size?: number;
+                /** @description field[,asc|desc]; sortable: name, industry, employeeCount, annualRevenue, createdAt, updatedAt, number */
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseAccountSummaryResponse"];
+                };
+            };
+        };
+    };
+    create_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+        };
+    };
+    restore_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+        };
+    };
+    archive_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+        };
+    };
+    summary: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                ownerId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineSummaryResponse"];
+                };
+            };
+        };
+    };
+    get_5: {
         parameters: {
             query?: never;
             header?: never;

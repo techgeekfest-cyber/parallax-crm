@@ -1,4 +1,4 @@
-package com.parallaxcrm.leads;
+package com.parallaxcrm.shared.domain;
 
 public enum LeadSource {
     WEB,

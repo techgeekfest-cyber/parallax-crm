@@ -1,6 +1,6 @@
 package com.parallaxcrm.leads.web;
 
-import com.parallaxcrm.leads.LeadSource;
+import com.parallaxcrm.shared.domain.LeadSource;
 import com.parallaxcrm.leads.NewLead;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;

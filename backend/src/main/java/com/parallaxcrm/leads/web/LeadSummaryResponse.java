@@ -1,7 +1,7 @@
 package com.parallaxcrm.leads.web;
 
 import com.parallaxcrm.identity.UserSummary;
-import com.parallaxcrm.leads.LeadSource;
+import com.parallaxcrm.shared.domain.LeadSource;
 import com.parallaxcrm.leads.LeadStatus;
 import com.parallaxcrm.leads.internal.Lead;
 import org.jspecify.annotations.Nullable;

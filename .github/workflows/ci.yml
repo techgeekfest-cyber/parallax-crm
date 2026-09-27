@@ -123,6 +123,23 @@ jobs:
         run: npx playwright test
         env:
           E2E_FRESH_DB: "1"
+          E2E_RESTART_PHASE: before
+          BACKEND_URL: http://localhost:8080
+
+      - name: Restart the backend
+        working-directory: backend
+        run: |
+          pkill -f 'parallaxcrm-backend-.*\.jar'
+          while pgrep -f 'parallaxcrm-backend-.*\.jar' > /dev/null; do sleep 1; done
+          SPRING_PROFILES_ACTIVE=prod nohup java -jar target/parallaxcrm-backend-*.jar >> backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:8080/actuator/health && exit 0; sleep 2; done
+          cat backend.log; exit 1
+
+      - name: Data survives the restart
+        working-directory: frontend
+        run: npx playwright test zz-restart-persistence
+        env:
+          E2E_RESTART_PHASE: after
           BACKEND_URL: http://localhost:8080
 
       - name: Upload Playwright report

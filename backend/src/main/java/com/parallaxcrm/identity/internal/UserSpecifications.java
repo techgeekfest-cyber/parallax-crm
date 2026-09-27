@@ -5,19 +5,24 @@ import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
-final class UserSpecifications {
+public final class UserSpecifications {
 
     private UserSpecifications() {
     }
 
-    static Specification<User> matching(String query, Role role, Boolean active) {
+    public static Specification<User> matching(String query, Role role, Boolean active) {
+        return matching(query, role == null ? null : List.of(role), active);
+    }
+
+    public static Specification<User> matching(String query, Collection<Role> roles, Boolean active) {
         return (root, criteriaQuery, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (role != null) {
-                predicates.add(cb.equal(root.get("role"), role));
+            if (roles != null && !roles.isEmpty()) {
+                predicates.add(root.get("role").in(roles));
             }
             if (active != null) {
                 predicates.add(cb.equal(root.get("active"), active));
