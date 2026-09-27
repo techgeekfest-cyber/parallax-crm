@@ -1,10 +1,15 @@
 package com.parallaxcrm.leads.web;
 
+import com.parallaxcrm.accounts.AccountService;
+import com.parallaxcrm.contacts.ContactService;
 import com.parallaxcrm.identity.UserDirectory;
 import com.parallaxcrm.identity.UserSummary;
+import com.parallaxcrm.leads.LeadConversion;
+import com.parallaxcrm.leads.LeadConversionResult;
 import com.parallaxcrm.leads.LeadService;
 import com.parallaxcrm.leads.LeadStatus;
 import com.parallaxcrm.leads.internal.Lead;
+import com.parallaxcrm.opportunities.OpportunityService;
 import com.parallaxcrm.shared.paging.PageRequests;
 import com.parallaxcrm.shared.paging.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,10 +44,17 @@ class LeadController {
 
     private final LeadService leads;
     private final UserDirectory users;
+    private final AccountService accounts;
+    private final ContactService contacts;
+    private final OpportunityService opportunities;
 
-    LeadController(LeadService leads, UserDirectory users) {
+    LeadController(LeadService leads, UserDirectory users, AccountService accounts, ContactService contacts,
+            OpportunityService opportunities) {
         this.leads = leads;
         this.users = users;
+        this.accounts = accounts;
+        this.contacts = contacts;
+        this.opportunities = opportunities;
     }
 
     @GetMapping
@@ -77,8 +89,48 @@ class LeadController {
         return ResponseEntity.created(location).body(withOwner(lead));
     }
 
+    @PostMapping("/{id}/status-transitions")
+    @Operation(summary = "Change a lead's status",
+            description = "Between NEW, CONTACTED, QUALIFIED and DISQUALIFIED. Converted leads never change "
+                    + "(409 ALREADY_CONVERTED). Records an audit event and a timeline activity.")
+    LeadResponse changeStatus(@PathVariable UUID id, @Valid @RequestBody LeadStatusTransitionRequest request) {
+        return withOwner(leads.changeStatus(id, request.status(), request.version()));
+    }
+
+    @PostMapping("/{id}/conversion")
+    @Operation(summary = "Convert a qualified lead",
+            description = "Creates (or links) the account, creates the contact and the opportunity, and marks the lead "
+                    + "CONVERTED — all in one transaction. 409 ALREADY_CONVERTED on a second attempt, 409 "
+                    + "INVALID_STATE_TRANSITION if the lead isn't qualified, 409 CONFLICT for a stale version.")
+    ResponseEntity<LeadConversionResponse> convert(@PathVariable UUID id, @Valid @RequestBody LeadConversion request) {
+        LeadConversionResult result = leads.convert(id, request);
+        var body = new LeadConversionResponse(withOwner(result.lead()),
+                new ConvertedRecordResponse(result.account().id(), result.account().number(), result.account().name()),
+                result.accountCreated(),
+                new ConvertedRecordResponse(result.contact().id(), result.contact().number(), result.contact().fullName()),
+                new ConvertedRecordResponse(result.opportunity().id(), result.opportunity().number(),
+                        result.opportunity().name()));
+        var location = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/v1/leads/{id}").buildAndExpand(id).toUri();
+        return ResponseEntity.created(location).body(body);
+    }
+
     private LeadResponse withOwner(Lead lead) {
         UserSummary owner = lead.getOwnerId() == null ? null : users.summaries(List.of(lead.getOwnerId())).get(lead.getOwnerId());
-        return LeadResponse.from(lead, owner);
+        return LeadResponse.from(lead, owner, conversionOf(lead));
+    }
+
+    private LeadConversionSummaryResponse conversionOf(Lead lead) {
+        if (!lead.isConverted()) {
+            return null;
+        }
+        var account = accounts.summaries(List.of(lead.getConvertedAccountId())).get(lead.getConvertedAccountId());
+        var contact = contacts.summaries(List.of(lead.getConvertedContactId())).get(lead.getConvertedContactId());
+        var opportunity = lead.getConvertedOpportunityId() == null ? null
+                : opportunities.summaries(List.of(lead.getConvertedOpportunityId())).get(lead.getConvertedOpportunityId());
+        return new LeadConversionSummaryResponse(lead.getConvertedAt(),
+                account == null ? null : new ConvertedRecordResponse(account.id(), account.number(), account.name()),
+                contact == null ? null : new ConvertedRecordResponse(contact.id(), contact.number(), contact.fullName()),
+                opportunity == null ? null : new ConvertedRecordResponse(opportunity.id(), opportunity.number(), opportunity.name()));
     }
 }

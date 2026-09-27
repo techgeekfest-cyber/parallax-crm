@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftIcon, MailIcon, SearchXIcon } from "lucide-react";
+import { ArrowLeftIcon, Building2Icon, CheckCircle2Icon, ContactRoundIcon, HandshakeIcon, MailIcon, SearchXIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/states/empty-state";
@@ -9,10 +9,12 @@ import { ErrorState } from "@/components/states/error-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ActivityTimeline } from "@/features/activities/activity-timeline";
 import { describeError, isApiError } from "@/lib/api/errors";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 
-import { useLead } from "./api";
+import { useLead, type Lead } from "./api";
+import { LeadActions } from "./lead-actions";
 import { LEAD_SOURCE_LABELS } from "./labels";
 import { LeadStatusBadge } from "./lead-status-badge";
 
@@ -56,11 +58,16 @@ export function LeadDetailView({ id }: { id: string }) {
                 {lead.company} · <span className="font-mono text-xs">{lead.number}</span>
               </p>
             </div>
-            <Button variant="outline" render={<a href={`mailto:${lead.email}`} />} nativeButton={false}>
-              <MailIcon data-icon="inline-start" />
-              Email
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button variant="outline" render={<a href={`mailto:${lead.email}`} />} nativeButton={false}>
+                <MailIcon data-icon="inline-start" />
+                Email
+              </Button>
+              <LeadActions lead={lead} />
+            </div>
           </header>
+
+          {lead.conversion && <ConversionCard conversion={lead.conversion} />}
 
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -129,10 +136,46 @@ export function LeadDetailView({ id }: { id: string }) {
                 )}
               </CardContent>
             </Card>
+
+            <ActivityTimeline className="lg:col-span-3" target={{ type: "lead", id: lead.id }} canLog />
           </div>
         </>
       )}
     </div>
+  );
+}
+
+/** Where a converted lead went: links to the account, contact and opportunity it became. */
+function ConversionCard({ conversion }: { conversion: NonNullable<Lead["conversion"]> }) {
+  const records = [
+    { label: "Account", icon: Building2Icon, record: conversion.account, href: (id: string) => `/accounts/${id}` },
+    { label: "Contact", icon: ContactRoundIcon, record: conversion.contact, href: (id: string) => `/contacts/${id}` },
+    { label: "Opportunity", icon: HandshakeIcon, record: conversion.opportunity, href: (id: string) => `/opportunities/${id}` },
+  ];
+  return (
+    <section aria-label="Conversion" className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <CheckCircle2Icon className="size-4 text-emerald-600" aria-hidden="true" />
+        Converted {formatDateTime(conversion.convertedAt)}
+      </p>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+        {records.map(({ label, icon: Icon, record, href }) => (
+          <li key={label} className="min-w-0 rounded-lg border bg-card px-3 py-2">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Icon className="size-3.5" aria-hidden="true" />
+              {label}
+            </span>
+            {record ? (
+              <Link href={href(record.id)} className="block truncate text-sm font-medium hover:text-primary hover:underline">
+                {record.name}
+              </Link>
+            ) : (
+              <span className="text-sm text-muted-foreground">Not available</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

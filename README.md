@@ -3,9 +3,10 @@
 **Enterprise Customer Relationship Platform** — leads, accounts, contacts, opportunities, pipeline and analytics,
 built as a real full-stack application: Next.js → Spring Boot → PostgreSQL.
 
-> Status: **Phase A2 — core CRM.** Leads, accounts (Enterprise / SMB / Startup), contacts, opportunities and sales reps,
-> with search, filters, pagination, archiving and role-based permissions, all backed by PostgreSQL.
-> See the [roadmap](#roadmap).
+> Status: **Phase A3 — sales workflows.** Qualify and convert leads into accounts, contacts and opportunities in one
+> transaction; move deals through an enforced stage workflow on a drag-and-drop Kanban pipeline; every step is recorded
+> in stage history, the audit trail and an activity timeline. Built on the A2 core CRM (leads, accounts, contacts,
+> opportunities, sales reps), all backed by PostgreSQL. See the [roadmap](#roadmap).
 
 ParallaxCRM is a ground-up rebuild of a Java OOP coursework project. The original domain model — leads, contacts,
 opportunities, an `Account` hierarchy (Enterprise / SMB / Startup), sales reps — is kept, but redesigned as a
@@ -19,14 +20,16 @@ production-style modular monolith with a real database, a documented REST API, a
   ([ADR 0001](docs/adr/0001-modular-monolith.md)).
 - **Database-enforced invariants.** Flyway-managed schema with `CHECK`, `UNIQUE` and foreign-key constraints backing the
   domain rules.
-- **Trustworthy history.** Audit events are written in the same transaction as the change they describe
-  ([ADR 0006](docs/adr/0006-synchronous-audit.md)).
+- **Trustworthy history.** Audit events and timeline activities are written in the same transaction as the change they
+  describe ([ADR 0006](docs/adr/0006-synchronous-audit.md)).
+- **Explicit workflows.** Stage changes, lead qualification and conversion are dedicated actions with enforced rules,
+  never a side effect of a generic edit ([ADR 0008](docs/adr/0008-opportunity-stage-workflow.md)).
 
 ## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS 4, shadcn/ui (Base UI), TanStack Query, React Hook Form + Zod |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS 4, shadcn/ui (Base UI), TanStack Query, React Hook Form + Zod, dnd-kit |
 | Backend | Java 25, Spring Boot 4.1, Spring Data JPA, Spring Modulith, Bean Validation, springdoc-openapi |
 | Database | PostgreSQL 17, Flyway |
 | Testing | JUnit 5, AssertJ, Testcontainers, Vitest, Testing Library, Playwright |
@@ -40,15 +43,16 @@ production-style modular monolith with a real database, a documented REST API, a
 │   └── src/main/java/com/parallaxcrm/
 │       ├── shared/          base entity, error model, paging, request IDs (open module)
 │       ├── identity/        users, sign-in, sessions, roles, access policy
-│       ├── leads/           Lead module: public service, internal domain, web layer
+│       ├── leads/           leads, status workflow and conversion
 │       ├── accounts/        account hierarchy (Enterprise / SMB / Startup)
 │       ├── contacts/        people at accounts
-│       ├── opportunities/   deals, pipeline totals, stage history
+│       ├── opportunities/   deals, stage workflow and history, pipeline board
+│       ├── activities/      activity timeline (logged and workflow activities)
 │       ├── salesteam/       sales profiles and live rep figures
 │       └── audit/           immutable audit trail
 ├── frontend/                Next.js app
 │   ├── src/app/             routes
-│   ├── src/features/        feature modules (leads, accounts, contacts, opportunities, sales-reps, users…)
+│   ├── src/features/        feature modules (leads, accounts, contacts, opportunities, pipeline, activities…)
 │   ├── src/lib/api/         typed API client generated from OpenAPI
 │   ├── test/                unit tests (Vitest)
 │   └── e2e/                 end-to-end tests (Playwright)
@@ -80,7 +84,8 @@ npm run dev
 
 Open http://localhost:3000 and sign in as the development admin that the `local` profile creates on an empty
 database: **admin@parallax.local** / **parallax-local-admin**. From **Users** you can add sales managers and reps.
-No CRM data is seeded; create your first lead from the Leads page.
+No CRM data is seeded; create your first lead from the Leads page, qualify it, convert it, and work the deal on
+**Pipeline**.
 
 Useful URLs while the backend is running:
 
@@ -163,7 +168,9 @@ Neon shows connection strings as `postgresql://user:password@host/dbname?sslmode
 | `PUT` | `/api/v1/users/{id}` | admin | Update name, role, active (with `version`); role/active changes end their sessions |
 | `GET` | `/api/v1/leads` | signed in | List leads — `q`, `status`, `ownerId`, paging, `sort`. Reps see only their own |
 | `POST` | `/api/v1/leads` | signed in | Create a lead; `ownerId` defaults to you (only managers/admins may assign others) |
-| `GET` | `/api/v1/leads/{id}` | owner, manager, admin | Get a lead |
+| `GET` | `/api/v1/leads/{id}` | owner, manager, admin | Get a lead (with links to what it was converted into) |
+| `POST` | `/api/v1/leads/{id}/status-transitions` | owner, manager, admin | Move between New, Contacted, Qualified, Disqualified (with `version`) |
+| `POST` | `/api/v1/leads/{id}/conversion` | owner, manager, admin | Convert a qualified lead into a new or existing account, a contact and an opportunity — one transaction |
 | `GET` `POST` | `/api/v1/accounts` | signed in | List (`q`, `type`, `ownerId`, `archived`, paging, `sort`) / create |
 | `GET` `PUT` | `/api/v1/accounts/{id}` | read: all · edit: owner, manager, admin | Get / update (with `version`) |
 | `POST` | `/api/v1/accounts/{id}/archive`, `/restore` | manager, admin | Archive / restore |
@@ -172,7 +179,12 @@ Neon shows connection strings as `postgresql://user:password@host/dbname?sslmode
 | `POST` | `/api/v1/contacts/{id}/archive`, `/restore` | manager, admin | Archive / restore |
 | `GET` `POST` | `/api/v1/opportunities` | signed in | List (`q`, `stage`, `accountId`, `ownerId`, `archived`…) / create. Reps see their own |
 | `GET` | `/api/v1/opportunities/summary` | signed in | Open, weighted and won totals over what you can see |
-| `GET` `PUT` | `/api/v1/opportunities/{id}` | owner, manager, admin | Get (with stage history) / update |
+| `GET` `PUT` | `/api/v1/opportunities/{id}` | owner, manager, admin | Get (with stage history and `allowedStages`) / update details (not the stage) |
+| `POST` | `/api/v1/opportunities/{id}/stage-transitions` | owner, manager, admin | Move to another stage under the workflow rules (with `version`) |
+| `GET` | `/api/v1/opportunities/{id}/stage-history` | owner, manager, admin | Every stage entered, with who, when, amount and probability |
+| `GET` | `/api/v1/pipeline` | signed in | Kanban board: per-stage cards, counts and amounts, plus totals (`q`, `ownerId`, `accountId`, `limit`). Reps see their own |
+| `GET` | `/api/v1/activities` | whoever can open the record | A record's timeline, newest first (`leadId` \| `accountId` \| `contactId` \| `opportunityId`, paging) |
+| `POST` | `/api/v1/activities` | whoever can work the record | Log a call, email, meeting or note against one record |
 | `POST` | `/api/v1/opportunities/{id}/archive`, `/restore` | manager, admin | Archive / restore |
 | `GET` | `/api/v1/sales-reps`, `/api/v1/sales-reps/{id}` | signed in (reps: themselves) | Profiles with YTD sales, attainment, pipeline, record counts |
 | `POST` | `/api/v1/sales-reps` | admin | Create a rep's sign-in account and profile together |
@@ -180,7 +192,8 @@ Neon shows connection strings as `postgresql://user:password@host/dbname?sslmode
 | `GET` | `/actuator/health` | anyone | Liveness/readiness, including database connectivity |
 
 Write requests must send the `XSRF-TOKEN` cookie value in the `X-XSRF-TOKEN` header.
-Errors use RFC 7807 ProblemDetail with a stable `code` (`VALIDATION_FAILED`, `DUPLICATE_RECORD`, `RECORD_NOT_FOUND`, …),
+Errors use RFC 7807 ProblemDetail with a stable `code` (`VALIDATION_FAILED`, `DUPLICATE_RECORD`, `RECORD_NOT_FOUND`,
+`CONFLICT`, `INVALID_STATE_TRANSITION`, `ALREADY_CONVERTED`, …),
 `fieldErrors` where relevant, and a `requestId` that matches the `X-Request-Id` response header.
 
 ## Roadmap
@@ -190,9 +203,9 @@ Errors use RFC 7807 ProblemDetail with a stable `code` (`VALIDATION_FAILED`, `DU
 | **A0** ✅ | Foundation, CI, Docker, Flyway schema, Leads vertical slice |
 | **A1** ✅ | Authentication (Spring Session), roles (Admin / Sales Manager / Sales Rep), access policy, user admin |
 | **A2** ✅ | Sales reps, account hierarchy, contacts, opportunities; editing, archiving, assignment |
-| A3 | Lead conversion, opportunity stage machine and history, Kanban pipeline, conflict handling |
+| **A3** ✅ | Lead status and conversion, opportunity stage workflow and history, Kanban pipeline, activity timeline, conflict handling |
 | A4 | Live dashboard and analytics |
-| B | Activity timeline, audit viewer, command palette and global search, CSV import/export |
+| B | Audit viewer, command palette and global search, CSV import/export |
 | Later | Real-time updates (SSE), intelligence layer (lead scoring, risk, recommendations) |
 
 Architecture details: [docs/architecture.md](docs/architecture.md).

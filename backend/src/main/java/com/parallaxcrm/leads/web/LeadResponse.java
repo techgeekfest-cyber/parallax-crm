@@ -24,14 +24,16 @@ public record LeadResponse(
         @Nullable BigDecimal estimatedValue,
         @Nullable String notes,
         @Nullable OwnerResponse owner,
+        /* present once the lead has been converted */
+        @Nullable LeadConversionSummaryResponse conversion,
         Instant createdAt,
         Instant updatedAt,
         long version) {
 
-    static LeadResponse from(Lead lead, UserSummary owner) {
+    static LeadResponse from(Lead lead, UserSummary owner, LeadConversionSummaryResponse conversion) {
         return new LeadResponse(lead.getId(), lead.getNumber(), lead.getFirstName(), lead.getLastName(),
                 lead.fullName(), lead.getCompany(), lead.getEmail(), lead.getPhone(), lead.getStatus(),
-                lead.getSource(), lead.getEstimatedValue(), lead.getNotes(), OwnerResponse.from(owner), lead.getCreatedAt(),
-                lead.getUpdatedAt(), lead.getVersion());
+                lead.getSource(), lead.getEstimatedValue(), lead.getNotes(), OwnerResponse.from(owner), conversion,
+                lead.getCreatedAt(), lead.getUpdatedAt(), lead.getVersion());
     }
 }

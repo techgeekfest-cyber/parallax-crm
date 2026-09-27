@@ -13,7 +13,10 @@ import java.util.UUID;
 
 public interface OpportunityRepository extends JpaRepository<Opportunity, UUID>, JpaSpecificationExecutor<Opportunity> {
 
-    /** Totals per stage for active opportunities, optionally limited to one account and/or one owner. */
+    /**
+     * Totals per stage for active opportunities, optionally limited to one account, one owner and/or a name/number
+     * search ({@code pattern} from {@link OpportunitySpecifications#likePattern}).
+     */
     @Query(nativeQuery = true, value = """
             select stage as stage, count(*) as total, coalesce(sum(amount), 0) as amount,
                    coalesce(sum(amount * probability / 100.0), 0) as weighted
@@ -21,8 +24,12 @@ public interface OpportunityRepository extends JpaRepository<Opportunity, UUID>,
             where archived_at is null
               and (cast(:accountId as uuid) is null or account_id = cast(:accountId as uuid))
               and (cast(:ownerId as uuid) is null or owner_id = cast(:ownerId as uuid))
+              and (cast(:pattern as text) is null
+                   or lower(name) like cast(:pattern as text) escape '\\'
+                   or lower(number) like cast(:pattern as text) escape '\\')
             group by stage""")
-    List<StageTotals> totalsByStage(@Param("accountId") UUID accountId, @Param("ownerId") UUID ownerId);
+    List<StageTotals> totalsByStage(@Param("accountId") UUID accountId, @Param("ownerId") UUID ownerId,
+            @Param("pattern") String pattern);
 
     @Query(nativeQuery = true, value = """
             select owner_id as ownerId,

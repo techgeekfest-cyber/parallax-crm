@@ -11,6 +11,10 @@ public enum ErrorCode {
     RECORD_NOT_FOUND,
     DUPLICATE_RECORD,
     CONFLICT,
+    /** A workflow action the record's current state doesn't allow, e.g. an invalid stage transition. */
+    INVALID_STATE_TRANSITION,
+    /** A second conversion of a lead that has already been converted. */
+    ALREADY_CONVERTED,
     DATA_INTEGRITY,
     UNAUTHENTICATED,
     PERMISSION_DENIED,

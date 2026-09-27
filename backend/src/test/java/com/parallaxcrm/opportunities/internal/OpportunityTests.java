@@ -2,7 +2,9 @@ package com.parallaxcrm.opportunities.internal;
 
 import com.parallaxcrm.opportunities.OpportunityInput;
 import com.parallaxcrm.opportunities.OpportunityStage;
+import com.parallaxcrm.shared.error.ErrorCode;
 import com.parallaxcrm.shared.error.InvalidRequestException;
+import com.parallaxcrm.shared.error.WorkflowRuleException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -41,10 +43,78 @@ class OpportunityTests {
     @Test
     void reopeningClearsTheCloseTime() {
         Opportunity opportunity = create(OpportunityStage.CLOSED_LOST, null);
-        opportunity.update(input(OpportunityStage.NEGOTIATION, null), UUID.randomUUID());
+        opportunity.transitionTo(OpportunityStage.NEGOTIATION);
 
         assertThat(opportunity.getClosedAt()).isNull();
         assertThat(opportunity.getProbability()).isEqualTo(75);
+    }
+
+    @Test
+    void aTransitionResetsTheProbabilityToTheNewStageDefault() {
+        Opportunity opportunity = create(OpportunityStage.PROPOSAL, 65);
+        opportunity.transitionTo(OpportunityStage.NEGOTIATION);
+
+        assertThat(opportunity.getStage()).isEqualTo(OpportunityStage.NEGOTIATION);
+        assertThat(opportunity.getProbability()).isEqualTo(75);
+        assertThat(opportunity.getClosedAt()).isNull();
+
+        opportunity.transitionTo(OpportunityStage.CLOSED_WON);
+        assertThat(opportunity.getProbability()).isEqualTo(100);
+        assertThat(opportunity.getClosedAt()).isNotNull();
+    }
+
+    @Test
+    void skippingStagesIsNotAllowed() {
+        Opportunity opportunity = create(OpportunityStage.PROSPECTING, null);
+
+        assertThatThrownBy(() -> opportunity.transitionTo(OpportunityStage.PROPOSAL))
+                .isInstanceOf(WorkflowRuleException.class)
+                .extracting("code").isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        assertThatThrownBy(() -> opportunity.transitionTo(OpportunityStage.CLOSED_WON))
+                .hasMessageContaining("can't move to Closed won");
+        assertThat(opportunity.getStage()).isEqualTo(OpportunityStage.PROSPECTING);
+    }
+
+    @Test
+    void movingToTheCurrentStageIsRejected() {
+        assertThatThrownBy(() -> create(OpportunityStage.PROPOSAL, null).transitionTo(OpportunityStage.PROPOSAL))
+                .isInstanceOf(WorkflowRuleException.class)
+                .hasMessageContaining("already in Proposal");
+    }
+
+    @Test
+    void anEditCannotChangeTheStage() {
+        Opportunity opportunity = create(OpportunityStage.PROSPECTING, null);
+
+        assertThatThrownBy(() -> opportunity.update(input(OpportunityStage.NEGOTIATION, null), UUID.randomUUID()))
+                .isInstanceOf(InvalidRequestException.class)
+                .extracting("field").isEqualTo("stage");
+        opportunity.update(input(null, 15), UUID.randomUUID());
+        assertThat(opportunity.getStage()).isEqualTo(OpportunityStage.PROSPECTING);
+        assertThat(opportunity.getProbability()).isEqualTo(15);
+    }
+
+    @Test
+    void theStageWorkflowIsExplicit() {
+        assertThat(OpportunityStage.PROSPECTING.allowedTransitions())
+                .containsExactly(OpportunityStage.QUALIFICATION, OpportunityStage.CLOSED_LOST);
+        assertThat(OpportunityStage.QUALIFICATION.allowedTransitions())
+                .containsExactly(OpportunityStage.PROSPECTING, OpportunityStage.PROPOSAL, OpportunityStage.CLOSED_LOST);
+        assertThat(OpportunityStage.PROPOSAL.allowedTransitions())
+                .containsExactly(OpportunityStage.QUALIFICATION, OpportunityStage.NEGOTIATION, OpportunityStage.CLOSED_LOST);
+        assertThat(OpportunityStage.NEGOTIATION.allowedTransitions())
+                .containsExactly(OpportunityStage.PROPOSAL, OpportunityStage.CLOSED_WON, OpportunityStage.CLOSED_LOST);
+        // Closed deals reopen into any open stage, and never flip straight between won and lost.
+        for (OpportunityStage closed : new OpportunityStage[] {OpportunityStage.CLOSED_WON, OpportunityStage.CLOSED_LOST}) {
+            assertThat(closed.allowedTransitions()).containsExactly(OpportunityStage.PROSPECTING,
+                    OpportunityStage.QUALIFICATION, OpportunityStage.PROPOSAL, OpportunityStage.NEGOTIATION);
+        }
+    }
+
+    @Test
+    void stagesHaveReadableLabels() {
+        assertThat(OpportunityStage.CLOSED_WON.label()).isEqualTo("Closed won");
+        assertThat(OpportunityStage.PROSPECTING.label()).isEqualTo("Prospecting");
     }
 
     @Test

@@ -204,6 +204,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/opportunities/{id}/stage-transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move an opportunity to another stage
+         * @description The pipeline workflow: one stage at a time forwards or back, won only from Negotiation, lost from any open stage, closed deals reopen into any open stage. Resets the probability to the stage default and records stage history, an audit event and a timeline activity. 409 INVALID_STATE_TRANSITION for a move the workflow doesn't allow, 409 CONFLICT for a stale version.
+         */
+        post: operations["transition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/opportunities/{id}/restore": {
         parameters: {
             query?: never;
@@ -259,6 +279,46 @@ export interface paths {
         put?: never;
         /** Create a lead */
         post: operations["create_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/leads/{id}/status-transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change a lead's status
+         * @description Between NEW, CONTACTED, QUALIFIED and DISQUALIFIED. Converted leads never change (409 ALREADY_CONVERTED). Records an audit event and a timeline activity.
+         */
+        post: operations["changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/leads/{id}/conversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert a qualified lead
+         * @description Creates (or links) the account, creates the contact and the opportunity, and marks the lead CONVERTED — all in one transaction. 409 ALREADY_CONVERTED on a second attempt, 409 INVALID_STATE_TRANSITION if the lead isn't qualified, 409 CONFLICT for a stale version.
+         */
+        post: operations["convert"];
         delete?: never;
         options?: never;
         head?: never;
@@ -346,6 +406,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A record's activity timeline
+         * @description Newest first. Give exactly one of leadId, accountId, contactId or opportunityId; you see the timeline of any record you can open.
+         */
+        get: operations["timeline"];
+        put?: never;
+        /**
+         * Log a call, email, meeting or note
+         * @description On a lead or opportunity you can work on, or on any active account or contact.
+         */
+        post: operations["log"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounts": {
         parameters: {
             query?: never;
@@ -401,6 +485,43 @@ export interface paths {
          * @description Managers and admins.
          */
         post: operations["archive_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The pipeline board
+         * @description One column per stage with its count, amount and weighted amount, plus the cards to show. Covers active opportunities you can see (reps: their own).
+         */
+        get: operations["board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/stage-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every stage the opportunity entered, oldest first */
+        get: operations["stageHistory"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -557,8 +678,11 @@ export interface components {
             accountId: string;
             name: string;
             amount: number;
-            /** @enum {string} */
-            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /**
+             * @description Starting stage on create (default PROSPECTING). On update it must be omitted or unchanged: stages change only through POST /opportunities/{id}/stage-transitions.
+             * @enum {string}
+             */
+            stage?: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
             /**
              * Format: int32
              * @description 0–100. Omit to use the stage's default. Closed stages are always 100 (won) or 0 (lost).
@@ -615,6 +739,7 @@ export interface components {
             /** Format: date-time */
             closedAt?: string;
             stageHistory: components["schemas"]["StageHistoryResponse"][];
+            allowedStages: ("PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST")[];
             archived: boolean;
             /** Format: date-time */
             archivedAt?: string;
@@ -822,6 +947,17 @@ export interface components {
             territory?: string;
             quota?: number;
         };
+        StageTransitionRequest: {
+            /** @enum {string} */
+            toStage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /**
+             * Format: int64
+             * @description The version you last loaded; a newer version on the server is a 409 CONFLICT.
+             */
+            version: number;
+            /** @description Optional context, e.g. why the deal was lost. Shown on the timeline. */
+            note?: string;
+        };
         CreateLeadRequest: {
             firstName: string;
             lastName: string;
@@ -838,6 +974,19 @@ export interface components {
              * @description Owner; defaults to the signed-in user. Only managers and admins may assign to others.
              */
             ownerId?: string;
+        };
+        ConvertedRecordResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            name: string;
+        };
+        LeadConversionSummaryResponse: {
+            /** Format: date-time */
+            convertedAt: string;
+            account?: components["schemas"]["ConvertedRecordResponse"];
+            contact?: components["schemas"]["ConvertedRecordResponse"];
+            opportunity?: components["schemas"]["ConvertedRecordResponse"];
         };
         LeadResponse: {
             /** Format: uuid */
@@ -856,6 +1005,7 @@ export interface components {
             estimatedValue?: number;
             notes?: string;
             owner?: components["schemas"]["OwnerResponse"];
+            conversion?: components["schemas"]["LeadConversionSummaryResponse"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -868,6 +1018,79 @@ export interface components {
             id: string;
             fullName: string;
             active: boolean;
+        };
+        LeadStatusTransitionRequest: {
+            /**
+             * @description NEW, CONTACTED, QUALIFIED or DISQUALIFIED. Leads become CONVERTED by conversion.
+             * @enum {string}
+             */
+            status: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+            /**
+             * Format: int64
+             * @description The version you last loaded; a newer version on the server is a 409 CONFLICT.
+             */
+            version: number;
+        };
+        ConversionAccount: {
+            /** @enum {string} */
+            type: "ENTERPRISE" | "SMB" | "STARTUP";
+            name: string;
+            website?: string;
+            phone?: string;
+            industry?: string;
+        };
+        ConversionContact: {
+            firstName: string;
+            lastName: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+            title?: string;
+            /** @description Make the contact the account's primary contact (demotes the current one). */
+            primary?: boolean;
+        };
+        ConversionOpportunity: {
+            name: string;
+            amount: number;
+            /** Format: date */
+            closeDate: string;
+            /**
+             * @description An open stage; defaults to PROSPECTING.
+             * @enum {string}
+             */
+            stage?: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** @enum {string} */
+            type?: "NEW_BUSINESS" | "EXISTING_BUSINESS" | "RENEWAL" | "UPSELL";
+            nextStep?: string;
+            description?: string;
+        };
+        LeadConversion: {
+            /**
+             * Format: int64
+             * @description The lead version you reviewed; a newer version on the server is a 409 CONFLICT.
+             */
+            version: number;
+            /**
+             * Format: uuid
+             * @description Attach the contact and opportunity to this active account instead of creating one.
+             */
+            existingAccountId?: string;
+            /** @description The new account. Required unless existingAccountId is given. */
+            account?: components["schemas"]["ConversionAccount"];
+            contact: components["schemas"]["ConversionContact"];
+            opportunity: components["schemas"]["ConversionOpportunity"];
+            /**
+             * Format: uuid
+             * @description Owner of the new records; defaults to the lead's owner. Only managers and admins may choose someone else.
+             */
+            ownerId?: string;
+        };
+        LeadConversionResponse: {
+            lead: components["schemas"]["LeadResponse"];
+            account: components["schemas"]["ConvertedRecordResponse"];
+            accountCreated: boolean;
+            contact: components["schemas"]["ConvertedRecordResponse"];
+            opportunity: components["schemas"]["ConvertedRecordResponse"];
         };
         LoginRequest: {
             email: string;
@@ -888,6 +1111,48 @@ export interface components {
             manageUsers: boolean;
             viewUsers: boolean;
             accessAllSalesRecords: boolean;
+        };
+        ActivityRequest: {
+            /**
+             * @description CALL, EMAIL, MEETING or NOTE. Other types are written by workflows only.
+             * @enum {string}
+             */
+            type: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "STAGE_CHANGE" | "LEAD_CONVERSION" | "ASSIGNMENT" | "RECORD_UPDATE";
+            subject: string;
+            body?: string;
+            /**
+             * Format: date-time
+             * @description When it happened; defaults to now. Can't be in the future.
+             */
+            occurredAt?: string;
+            /** Format: uuid */
+            leadId?: string;
+            /** Format: uuid */
+            accountId?: string;
+            /** Format: uuid */
+            contactId?: string;
+            /** Format: uuid */
+            opportunityId?: string;
+        };
+        ActivityResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "STAGE_CHANGE" | "LEAD_CONVERSION" | "ASSIGNMENT" | "RECORD_UPDATE";
+            subject: string;
+            body?: string;
+            actor?: components["schemas"]["UserRefResponse"];
+            /** Format: date-time */
+            occurredAt: string;
+            system: boolean;
+            /** Format: uuid */
+            leadId?: string;
+            /** Format: uuid */
+            accountId?: string;
+            /** Format: uuid */
+            contactId?: string;
+            /** Format: uuid */
+            opportunityId?: string;
         };
         PageResponseUserResponse: {
             content: components["schemas"]["UserResponse"][];
@@ -910,6 +1175,51 @@ export interface components {
             totalElements: number;
             /** Format: int32 */
             totalPages: number;
+        };
+        PipelineCardResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            name: string;
+            account: components["schemas"]["AccountRefResponse"];
+            amount: number;
+            /** @enum {string} */
+            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** Format: int32 */
+            probability: number;
+            /** Format: date */
+            closeDate: string;
+            /** Format: date-time */
+            closedAt?: string;
+            nextStep?: string;
+            owner?: components["schemas"]["UserRefResponse"];
+            /** Format: int64 */
+            version: number;
+            allowedStages: ("PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST")[];
+        };
+        PipelineColumnResponse: {
+            /** @enum {string} */
+            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** Format: int64 */
+            count: number;
+            amount: number;
+            weightedAmount: number;
+            opportunities: components["schemas"]["PipelineCardResponse"][];
+        };
+        PipelineResponse: {
+            columns: components["schemas"]["PipelineColumnResponse"][];
+            totals: components["schemas"]["PipelineSummaryResponse"];
+        };
+        PipelineSummaryResponse: {
+            /** Format: int64 */
+            openCount: number;
+            openAmount: number;
+            weightedAmount: number;
+            /** Format: int64 */
+            wonCount: number;
+            wonAmount: number;
+            /** Format: int64 */
+            lostCount: number;
         };
         OpportunitySummaryResponse: {
             /** Format: uuid */
@@ -939,17 +1249,6 @@ export interface components {
             totalElements: number;
             /** Format: int32 */
             totalPages: number;
-        };
-        PipelineSummaryResponse: {
-            /** Format: int64 */
-            openCount: number;
-            openAmount: number;
-            weightedAmount: number;
-            /** Format: int64 */
-            wonCount: number;
-            wonAmount: number;
-            /** Format: int64 */
-            lostCount: number;
         };
         LeadSummaryResponse: {
             /** Format: uuid */
@@ -995,6 +1294,17 @@ export interface components {
         };
         PageResponseContactSummaryResponse: {
             content: components["schemas"]["ContactSummaryResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PageResponseActivityResponse: {
+            content: components["schemas"]["ActivityResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -1462,6 +1772,32 @@ export interface operations {
             };
         };
     };
+    transition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityResponse"];
+                };
+            };
+        };
+    };
     restore: {
         parameters: {
             query?: never;
@@ -1556,6 +1892,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeadResponse"];
+                };
+            };
+        };
+    };
+    changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadStatusTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadResponse"];
+                };
+            };
+        };
+    };
+    convert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadConversion"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadConversionResponse"];
                 };
             };
         };
@@ -1682,6 +2070,57 @@ export interface operations {
             };
         };
     };
+    timeline: {
+        parameters: {
+            query?: {
+                leadId?: string;
+                accountId?: string;
+                contactId?: string;
+                opportunityId?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseActivityResponse"];
+                };
+            };
+        };
+    };
+    log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityResponse"];
+                };
+            };
+        };
+    };
     list_5: {
         parameters: {
             query?: {
@@ -1777,6 +2216,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+        };
+    };
+    board: {
+        parameters: {
+            query?: {
+                /** @description Matches opportunity name or number */
+                q?: string;
+                accountId?: string;
+                /** @description Only this owner's opportunities. Reps may only pass their own id. */
+                ownerId?: string;
+                /** @description Cards per column, 1–100 */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineResponse"];
+                };
+            };
+        };
+    };
+    stageHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageHistoryResponse"][];
                 };
             };
         };

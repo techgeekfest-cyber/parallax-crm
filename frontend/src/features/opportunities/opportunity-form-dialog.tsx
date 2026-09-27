@@ -29,6 +29,7 @@ import { describeError, isApiError } from "@/lib/api/errors";
 
 import { opportunityKeys, useCreateOpportunity, useUpdateOpportunity, type Opportunity, type OpportunityStage } from "./api";
 import { isClosed, OPPORTUNITY_TYPE_LABELS, STAGE_DEFAULT_PROBABILITY, STAGE_LABELS, STAGES } from "./labels";
+import { StageBadge } from "./stage-badge";
 import {
   emptyOpportunityForm,
   opportunityFormSchema,
@@ -158,35 +159,45 @@ export function OpportunityFormDialog({
             <FormField id={`${id}-close`} label="Expected close date" error={errors.closeDate?.message}>
               <Input id={`${id}-close`} type="date" aria-invalid={!!errors.closeDate} {...form.register("closeDate")} />
             </FormField>
-            <FormField id={`${id}-stage`} label="Stage" error={errors.stage?.message}>
-              <Controller
-                control={form.control}
-                name="stage"
-                render={({ field }) => (
-                  <Select
-                    items={STAGE_LABELS}
-                    value={field.value}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      field.onChange(value);
-                      // A new stage suggests its default probability; the user can still override it.
-                      form.setValue("probability", String(STAGE_DEFAULT_PROBABILITY[value as OpportunityStage]));
-                    }}
-                  >
-                    <SelectTrigger id={`${id}-stage`} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STAGES.map((value) => (
-                        <SelectItem key={value} value={value}>
-                          {STAGE_LABELS[value]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </FormField>
+            {editing ? (
+              <div className="grid gap-1.5">
+                <p className="text-sm leading-none font-medium">Stage</p>
+                <div className="flex h-8 items-center">
+                  <StageBadge stage={opportunity.stage} />
+                </div>
+                <p className="text-xs text-muted-foreground">Change the stage with the stage controls on the opportunity.</p>
+              </div>
+            ) : (
+              <FormField id={`${id}-stage`} label="Stage" error={errors.stage?.message}>
+                <Controller
+                  control={form.control}
+                  name="stage"
+                  render={({ field }) => (
+                    <Select
+                      items={STAGE_LABELS}
+                      value={field.value}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        field.onChange(value);
+                        // A new stage suggests its default probability; the user can still override it.
+                        form.setValue("probability", String(STAGE_DEFAULT_PROBABILITY[value as OpportunityStage]));
+                      }}
+                    >
+                      <SelectTrigger id={`${id}-stage`} className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STAGES.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {STAGE_LABELS[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </FormField>
+            )}
             <FormField
               id={`${id}-probability`}
               label="Probability (%)"

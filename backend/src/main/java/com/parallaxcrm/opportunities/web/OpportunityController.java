@@ -28,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -107,6 +106,22 @@ class OpportunityController {
         return full(opportunities.update(id, request.toInput(), request.version()));
     }
 
+    @PostMapping("/{id}/stage-transitions")
+    @Operation(summary = "Move an opportunity to another stage",
+            description = "The pipeline workflow: one stage at a time forwards or back, won only from Negotiation, lost "
+                    + "from any open stage, closed deals reopen into any open stage. Resets the probability to the "
+                    + "stage default and records stage history, an audit event and a timeline activity. "
+                    + "409 INVALID_STATE_TRANSITION for a move the workflow doesn't allow, 409 CONFLICT for a stale version.")
+    OpportunityResponse transition(@PathVariable UUID id, @Valid @RequestBody StageTransitionRequest request) {
+        return full(opportunities.transition(id, request.toStage(), request.version(), request.note()));
+    }
+
+    @GetMapping("/{id}/stage-history")
+    @Operation(summary = "Every stage the opportunity entered, oldest first")
+    List<StageHistoryResponse> stageHistory(@PathVariable UUID id) {
+        return historyOf(opportunities.get(id));
+    }
+
     @PostMapping("/{id}/archive")
     @Operation(summary = "Archive an opportunity", description = "Managers and admins.")
     OpportunityResponse archive(@PathVariable UUID id) {
@@ -120,18 +135,20 @@ class OpportunityController {
     }
 
     private OpportunityResponse full(Opportunity o) {
-        List<StageHistoryEntry> history = opportunities.stageHistory(o);
-        List<UUID> people = new ArrayList<>(history.stream().map(StageHistoryEntry::getChangedBy).toList());
-        people.add(o.getOwnerId());
-        var userRefs = users.summaries(people);
+        var userRefs = users.summaries(List.of(o.getOwnerId()));
         var account = accounts.summaries(List.of(o.getAccountId())).get(o.getAccountId());
         return new OpportunityResponse(o.getId(), o.getNumber(), o.getName(), AccountRefResponse.from(account),
                 o.getAmount(), o.getStage(), o.getProbability(), o.weightedAmount(), o.getCloseDate(), o.getType(),
                 o.getLeadSource(), o.getDescription(), o.getNextStep(), UserSummary.ref(userRefs.get(o.getOwnerId())),
-                o.getClosedAt(),
-                history.stream().map(h -> new StageHistoryResponse(h.getFromStage(), h.getToStage(), h.getAmount(),
-                        h.getProbability(), UserSummary.ref(userRefs.get(h.getChangedBy())), h.getChangedAt())).toList(),
+                o.getClosedAt(), historyOf(o), opportunities.allowedStages(o),
                 o.isArchived(), o.getArchivedAt(), o.getCreatedAt(), o.getUpdatedAt(), o.getVersion(),
                 opportunities.permissionsFor(o));
+    }
+
+    private List<StageHistoryResponse> historyOf(Opportunity o) {
+        List<StageHistoryEntry> history = opportunities.stageHistory(o);
+        var people = users.summaries(history.stream().map(StageHistoryEntry::getChangedBy).toList());
+        return history.stream().map(h -> new StageHistoryResponse(h.getFromStage(), h.getToStage(), h.getAmount(),
+                h.getProbability(), UserSummary.ref(people.get(h.getChangedBy())), h.getChangedAt())).toList();
     }
 }

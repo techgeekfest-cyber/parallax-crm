@@ -142,6 +142,15 @@ public class AccountService {
                 accessPolicy.canArchiveSalesRecords(actor));
     }
 
+    /**
+     * For lead conversion: creates the account under the same rules as {@link #create} (including authorisation), as
+     * part of the caller's transaction, and returns the public summary other modules may use.
+     */
+    @Transactional
+    public AccountSummary createFromLead(AccountInput input) {
+        return create(input).toSummary();
+    }
+
     // --- For other modules. These do not authorise; callers apply their own policy. ---
 
     public Map<UUID, AccountSummary> summaries(Collection<UUID> ids) {

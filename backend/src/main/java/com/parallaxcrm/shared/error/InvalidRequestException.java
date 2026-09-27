@@ -16,6 +16,11 @@ public class InvalidRequestException extends ParallaxException {
         this.field = field;
     }
 
+    /** The same error for a field nested under {@code prefix}, e.g. {@code name} → {@code account.name}. */
+    public InvalidRequestException nestedUnder(String prefix) {
+        return field == null ? this : new InvalidRequestException(prefix + "." + field, getMessage());
+    }
+
     public String getField() {
         return field;
     }

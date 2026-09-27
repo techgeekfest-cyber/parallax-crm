@@ -21,7 +21,9 @@ public record OpportunityRequest(
         @NotNull UUID accountId,
         @NotBlank @Size(max = 200) String name,
         @NotNull @PositiveOrZero @Digits(integer = 13, fraction = 2) BigDecimal amount,
-        @NotNull OpportunityStage stage,
+        @Schema(description = "Starting stage on create (default PROSPECTING). On update it must be omitted or unchanged: "
+                + "stages change only through POST /opportunities/{id}/stage-transitions.")
+        OpportunityStage stage,
         @Schema(description = "0–100. Omit to use the stage's default. Closed stages are always 100 (won) or 0 (lost).")
         @Min(0) @Max(100) Integer probability,
         @NotNull LocalDate closeDate,

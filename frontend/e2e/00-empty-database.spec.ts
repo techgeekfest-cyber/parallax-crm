@@ -15,3 +15,11 @@ test("an empty database shows a helpful first-run state", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "No leads yet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "New lead" }).first()).toBeVisible();
 });
+
+test("an empty pipeline explains how deals get there", async ({ page }) => {
+  await page.goto("/pipeline");
+
+  await expect(page.getByRole("heading", { name: "Your pipeline is empty" })).toBeVisible();
+  // Totals come from the server even when there is nothing to add up.
+  await expect(page.getByText("0 open")).toBeVisible();
+});

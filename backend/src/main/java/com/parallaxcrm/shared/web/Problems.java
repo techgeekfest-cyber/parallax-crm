@@ -54,7 +54,7 @@ public final class Problems {
             case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
             case PERMISSION_DENIED, CSRF_REJECTED -> HttpStatus.FORBIDDEN;
             case NOT_FOUND, RECORD_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case DUPLICATE_RECORD, CONFLICT, DATA_INTEGRITY -> HttpStatus.CONFLICT;
+            case DUPLICATE_RECORD, CONFLICT, INVALID_STATE_TRANSITION, ALREADY_CONVERTED, DATA_INTEGRITY -> HttpStatus.CONFLICT;
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

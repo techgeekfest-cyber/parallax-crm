@@ -31,6 +31,8 @@ public record OpportunityResponse(
         @Nullable UserRefResponse owner,
         @Nullable Instant closedAt,
         List<StageHistoryResponse> stageHistory,
+        /* where the viewer may move it next through a stage transition (empty: they can't) */
+        List<OpportunityStage> allowedStages,
         boolean archived,
         @Nullable Instant archivedAt,
         Instant createdAt,

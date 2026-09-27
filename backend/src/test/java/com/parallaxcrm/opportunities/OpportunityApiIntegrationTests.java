@@ -64,25 +64,34 @@ class OpportunityApiIntegrationTests {
     }
 
     @Test
-    void changingTheStageRecordsHistoryAndClosingForcesProbability() {
+    void anEditCannotChangeTheStageButEditsOtherFieldsWithoutAddingHistory() {
         String id = api.create(rep, "/api/v1/opportunities", opportunity("Renewal 2027", 50000, "PROPOSAL"));
-        var won = opportunity("Renewal 2027", 55000, "CLOSED_WON");
-        won.put("probability", 40);
-        won.put("version", 0);
+        var skipAhead = opportunity("Renewal 2027", 55000, "CLOSED_WON");
+        skipAhead.put("version", 0);
 
-        assertThat(api.put(rep, "/api/v1/opportunities/{id}", won, id)).hasStatusOk().bodyJson()
-                .hasPathSatisfying("$.probability", v -> assertThat(v).isEqualTo(100))
-                .hasPathSatisfying("$.closedAt", v -> assertThat(v).isNotNull())
-                .hasPathSatisfying("$.stageHistory[*].toStage", v -> assertThat(v).asArray()
-                        .containsExactly("PROPOSAL", "CLOSED_WON"))
-                .hasPathSatisfying("$.stageHistory[1].amount", v -> assertThat(v).isEqualTo(55000.0));
+        // Stages change only through the stage-transition workflow, never through a generic edit.
+        assertThat(api.put(rep, "/api/v1/opportunities/{id}", skipAhead, id)).hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson().hasPathSatisfying("$.fieldErrors[0].field", v -> assertThat(v).isEqualTo("stage"));
 
-        // Editing other fields does not add history.
-        won.put("version", 1);
-        won.put("nextStep", "Kick-off call");
-        api.put(rep, "/api/v1/opportunities/{id}", won, id);
+        var edit = opportunity("Renewal 2027", 55000, "PROPOSAL");
+        edit.put("version", 0);
+        edit.put("nextStep", "Kick-off call");
+        assertThat(api.put(rep, "/api/v1/opportunities/{id}", edit, id)).hasStatusOk().bodyJson()
+                .hasPathSatisfying("$.nextStep", v -> assertThat(v).isEqualTo("Kick-off call"))
+                .hasPathSatisfying("$.stage", v -> assertThat(v).isEqualTo("PROPOSAL"));
         assertThat(database.count("select count(*) from opportunity_stage_history where opportunity_id = ?::uuid", id))
-                .isEqualTo(2);
+                .isEqualTo(1);
+    }
+
+    @Test
+    void anOpportunityCanBeCreatedInAClosedStageForAlreadyClosedDeals() {
+        var won = opportunity("Signed last quarter", 20000, "CLOSED_WON");
+        won.put("probability", 40);
+        String id = api.create(rep, "/api/v1/opportunities", won);
+
+        assertThat(api.get(rep, "/api/v1/opportunities/{id}", id)).hasStatusOk().bodyJson()
+                .hasPathSatisfying("$.probability", v -> assertThat(v).isEqualTo(100))
+                .hasPathSatisfying("$.closedAt", v -> assertThat(v).isNotNull());
     }
 
     @Test
