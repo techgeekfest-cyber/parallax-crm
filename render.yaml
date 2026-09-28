@@ -6,6 +6,7 @@ services:
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile
     plan: free
+    branch: main
     healthCheckPath: /actuator/health
     autoDeploy: true
     envVars:
