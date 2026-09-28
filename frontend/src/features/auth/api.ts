@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { api, postWithoutBody, request } from "@/lib/api/client";
+import { useHydrated } from "@/lib/use-hydrated";
 import type { components } from "@/lib/api/schema";
 
 export type Me = components["schemas"]["MeResponse"];
@@ -12,12 +13,19 @@ export type Permissions = Me["permissions"];
 
 export const meKey = ["auth", "me"] as const;
 
-export function useMe() {
-  return useQuery({
+/**
+ * The signed-in user, or undefined until known. The server never knows it (it is fetched in the browser), so while
+ * React hydrates server-rendered HTML this reports "not loaded" even if the browser already has the answer cached;
+ * role-dependent text and controls then appear right after hydration instead of making the first client render
+ * disagree with the server's HTML.
+ */
+export function useMe(): { data: Me | undefined } {
+  const { data } = useQuery({
     queryKey: meKey,
     queryFn: ({ signal }) => request(api.GET("/api/v1/auth/me", { signal })),
     staleTime: 5 * 60_000,
   });
+  return { data: useHydrated() ? data : undefined };
 }
 
 /** Permissions of the signed-in user, or undefined while loading. The API enforces them regardless. */
