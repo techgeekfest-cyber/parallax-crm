@@ -565,6 +565,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The dashboard
+         * @description Record counts, open and weighted pipeline, outcomes and win rate for the period, quota attainment, stage breakdown, won-revenue trend, close-date forecast and rep performance — all live SQL aggregates over what you can see. Reps always get their own figures.
+         */
+        get: operations["get_6"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -1276,6 +1296,126 @@ export interface components {
             totalElements: number;
             /** Format: int32 */
             totalPages: number;
+        };
+        DashboardResponse: {
+            period: components["schemas"]["PeriodResponse"];
+            scope: components["schemas"]["ScopeResponse"];
+            records: components["schemas"]["RecordCountsResponse"];
+            pipeline: components["schemas"]["PipelineTotalsResponse"];
+            outcomes: components["schemas"]["OutcomesResponse"];
+            quota: components["schemas"]["QuotaResponse"];
+            stages: components["schemas"]["StageBreakdownResponse"][];
+            trend: components["schemas"]["TrendPointResponse"][];
+            forecast: components["schemas"]["ForecastResponse"];
+            team: components["schemas"]["TeamPerformanceResponse"];
+        };
+        ForecastMonthResponse: {
+            /** Format: date */
+            month: string;
+            /** Format: int64 */
+            count: number;
+            amount: number;
+            weightedAmount: number;
+        };
+        ForecastResponse: {
+            months: components["schemas"]["ForecastMonthResponse"][];
+            /** Format: int64 */
+            overdueCount: number;
+            overdueAmount: number;
+            /** Format: int64 */
+            laterCount: number;
+            laterAmount: number;
+        };
+        OutcomesResponse: {
+            /** Format: int64 */
+            wonCount: number;
+            wonAmount: number;
+            /** Format: int64 */
+            lostCount: number;
+            winRatePercent?: number;
+            averageDealSize?: number;
+        };
+        PeriodResponse: {
+            /** @enum {string} */
+            range: "LAST_30_DAYS" | "LAST_90_DAYS" | "THIS_YEAR" | "LAST_12_MONTHS";
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @enum {string} */
+            bucket: "WEEK" | "MONTH";
+        };
+        PipelineTotalsResponse: {
+            /** Format: int64 */
+            openCount: number;
+            openAmount: number;
+            weightedAmount: number;
+        };
+        QuotaResponse: {
+            /** Format: int32 */
+            year: number;
+            ytdSales: number;
+            quota?: number;
+            attainmentPercent?: number;
+        };
+        RecordCountsResponse: {
+            /** Format: int64 */
+            leads: number;
+            /** Format: int64 */
+            openLeads: number;
+            /** Format: int64 */
+            newLeads: number;
+            /** Format: int64 */
+            accounts: number;
+            /** Format: int64 */
+            contacts: number;
+            /** Format: int64 */
+            opportunities: number;
+            /** Format: int64 */
+            newOpportunities: number;
+        };
+        RepPerformanceResponse: {
+            rep: components["schemas"]["UserRefResponse"];
+            role: string;
+            territory?: string;
+            quota?: number;
+            ytdSales: number;
+            attainmentPercent?: number;
+            /** Format: int64 */
+            wonCount: number;
+            wonAmount: number;
+            /** Format: int64 */
+            lostCount: number;
+            winRatePercent?: number;
+            /** Format: int64 */
+            openCount: number;
+            openAmount: number;
+            weightedAmount: number;
+        };
+        ScopeResponse: {
+            organisation: boolean;
+            owner?: components["schemas"]["UserRefResponse"];
+        };
+        StageBreakdownResponse: {
+            /** @enum {string} */
+            stage: "PROSPECTING" | "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+            /** Format: int64 */
+            count: number;
+            amount: number;
+            weightedAmount: number;
+            sharePercent?: number;
+        };
+        TeamPerformanceResponse: {
+            /** Format: int64 */
+            total: number;
+            rows: components["schemas"]["RepPerformanceResponse"][];
+        };
+        TrendPointResponse: {
+            /** Format: date */
+            periodStart: string;
+            /** Format: int64 */
+            wonCount: number;
+            wonAmount: number;
         };
         ContactSummaryResponse: {
             /** Format: uuid */
@@ -2311,6 +2451,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeadResponse"];
+                };
+            };
+        };
+    };
+    get_6: {
+        parameters: {
+            query?: {
+                /** @description Reporting period (default LAST_12_MONTHS) */
+                range?: "LAST_30_DAYS" | "LAST_90_DAYS" | "THIS_YEAR" | "LAST_12_MONTHS";
+                /** @description Only this owner's figures. Reps may only pass their own id. */
+                ownerId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
                 };
             };
         };

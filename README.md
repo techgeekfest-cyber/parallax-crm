@@ -3,7 +3,11 @@
 **Enterprise Customer Relationship Platform** — leads, accounts, contacts, opportunities, pipeline and analytics,
 built as a real full-stack application: Next.js → Spring Boot → PostgreSQL.
 
-> Status: **Phase A3 — sales workflows.** Qualify and convert leads into accounts, contacts and opportunities in one
+> Status: **Phase A4 — dashboard and analytics.** A live dashboard — pipeline, weighted pipeline, won revenue, win rate,
+> quota attainment, stage breakdown, revenue trend, close forecast and rep performance — computed by PostgreSQL
+> aggregate queries over what each user may see.
+>
+> **Phase A3 — sales workflows.** Qualify and convert leads into accounts, contacts and opportunities in one
 > transaction; move deals through an enforced stage workflow on a drag-and-drop Kanban pipeline; every step is recorded
 > in stage history, the audit trail and an activity timeline. Built on the A2 core CRM (leads, accounts, contacts,
 > opportunities, sales reps), all backed by PostgreSQL. See the [roadmap](#roadmap).
@@ -29,7 +33,7 @@ production-style modular monolith with a real database, a documented REST API, a
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS 4, shadcn/ui (Base UI), TanStack Query, React Hook Form + Zod, dnd-kit |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS 4, shadcn/ui (Base UI), TanStack Query, React Hook Form + Zod, dnd-kit, Recharts |
 | Backend | Java 25, Spring Boot 4.1, Spring Data JPA, Spring Modulith, Bean Validation, springdoc-openapi |
 | Database | PostgreSQL 17, Flyway |
 | Testing | JUnit 5, AssertJ, Testcontainers, Vitest, Testing Library, Playwright |
@@ -48,6 +52,7 @@ production-style modular monolith with a real database, a documented REST API, a
 │       ├── contacts/        people at accounts
 │       ├── opportunities/   deals, stage workflow and history, pipeline board
 │       ├── activities/      activity timeline (logged and workflow activities)
+│       ├── analytics/       dashboard figures (read-only SQL aggregates)
 │       ├── salesteam/       sales profiles and live rep figures
 │       └── audit/           immutable audit trail
 ├── frontend/                Next.js app
@@ -82,7 +87,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and sign in as the development admin that the `local` profile creates on an empty
+Open http://localhost:3000 and sign in (you land on the **Dashboard**) as the development admin that the `local` profile creates on an empty
 database: **admin@parallax.local** / **parallax-local-admin**. From **Users** you can add sales managers and reps.
 No CRM data is seeded; create your first lead from the Leads page, qualify it, convert it, and work the deal on
 **Pipeline**.
@@ -189,6 +194,7 @@ Neon shows connection strings as `postgresql://user:password@host/dbname?sslmode
 | `GET` | `/api/v1/sales-reps`, `/api/v1/sales-reps/{id}` | signed in (reps: themselves) | Profiles with YTD sales, attainment, pipeline, record counts |
 | `POST` | `/api/v1/sales-reps` | admin | Create a rep's sign-in account and profile together |
 | `PUT` | `/api/v1/sales-reps/{id}` | manager, admin | Update territory, title, quota (with `version`) |
+| `GET` | `/api/v1/dashboard` | signed in (reps: their own figures) | All dashboard figures in one response (`range` = `LAST_30_DAYS` \| `LAST_90_DAYS` \| `THIS_YEAR` \| `LAST_12_MONTHS`, `ownerId`). See [what each figure means](docs/architecture.md#what-each-figure-means) |
 | `GET` | `/actuator/health` | anyone | Liveness/readiness, including database connectivity |
 
 Write requests must send the `XSRF-TOKEN` cookie value in the `X-XSRF-TOKEN` header.
@@ -204,7 +210,7 @@ Errors use RFC 7807 ProblemDetail with a stable `code` (`VALIDATION_FAILED`, `DU
 | **A1** ✅ | Authentication (Spring Session), roles (Admin / Sales Manager / Sales Rep), access policy, user admin |
 | **A2** ✅ | Sales reps, account hierarchy, contacts, opportunities; editing, archiving, assignment |
 | **A3** ✅ | Lead status and conversion, opportunity stage workflow and history, Kanban pipeline, activity timeline, conflict handling |
-| A4 | Live dashboard and analytics |
+| **A4** ✅ | Live dashboard and analytics |
 | B | Audit viewer, command palette and global search, CSV import/export |
 | Later | Real-time updates (SSE), intelligence layer (lead scoring, risk, recommendations) |
 

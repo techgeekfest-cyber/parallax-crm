@@ -16,7 +16,7 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/leads$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
 }
 
 /** A real pointer drag, so dnd-kit's sensors see exactly what a person's mouse would produce. */
@@ -48,6 +48,7 @@ test("a qualified lead is converted and worked through the pipeline to Closed wo
   await signIn(page, repA.email);
 
   // 2. A real lead, created through the UI and stored in PostgreSQL.
+  await page.goto("/leads");
   await page.getByRole("button", { name: "New lead" }).first().click();
   let dialog = page.getByRole("dialog", { name: "New lead" });
   await dialog.getByLabel("First name").fill("Grace");
