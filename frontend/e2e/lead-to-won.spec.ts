@@ -19,17 +19,51 @@ async function signIn(page: Page, email: string) {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
-/** A real pointer drag, so dnd-kit's sensors see exactly what a person's mouse would produce. */
+type Point = { x: number; y: number };
+
+/** The centre of the part of an element that is on screen, or null if none of it is. */
+async function visibleCentre(locator: Locator): Promise<Point | null> {
+  return locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const left = Math.max(r.left, 0);
+    const right = Math.min(r.right, document.documentElement.clientWidth);
+    const top = Math.max(r.top, 0);
+    const bottom = Math.min(r.bottom, document.documentElement.clientHeight);
+    return right - left < 1 || bottom - top < 1 ? null : { x: (left + right) / 2, y: (top + bottom) / 2 };
+  });
+}
+
+/** The same, measured after the browser has painted two more frames (so any scrolling in progress has moved on). */
+async function visibleCentreNextFrames(locator: Locator): Promise<Point | null> {
+  await locator.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  return visibleCentre(locator);
+}
+
+/**
+ * A real pointer drag, so dnd-kit's sensors see exactly what a person's mouse would produce — and, like a person, it
+ * drops where it is looking. The board is wider than the screen and auto-scrolls while a card nears its edge, which
+ * moves the columns under the pointer; so the destination is brought into view first, and the pointer keeps aiming at
+ * the destination's visible centre until the board stops moving before it lets go.
+ */
 async function drag(page: Page, card: Locator, column: Locator) {
-  const from = (await card.boundingBox())!;
-  const to = (await column.boundingBox())!;
-  // Grab the bottom row of the card (not its link), move a little to start the drag, then travel to the column.
-  const startX = from.x + from.width / 2;
-  const startY = from.y + from.height - 10;
-  await page.mouse.move(startX, startY);
+  await column.evaluate((el) => el.scrollIntoView({ block: "nearest", inline: "nearest" }));
+  const from = await card.boundingBox();
+  expect(await visibleCentre(card), "the card to drag must be on screen").not.toBeNull();
+  // Grab the bottom row of the card (not its link), and move a little to start the drag.
+  const start = { x: from!.x + from!.width / 2, y: from!.y + from!.height - 10 };
+  await page.mouse.move(start.x, start.y);
   await page.mouse.down();
-  await page.mouse.move(startX + 12, startY + 12, { steps: 4 });
-  await page.mouse.move(to.x + to.width / 2, to.y + 140, { steps: 20 });
+  await page.mouse.move(start.x + 12, start.y + 12, { steps: 4 });
+
+  let target = await visibleCentre(column);
+  for (let attempt = 0; ; attempt++) {
+    expect(target, "the destination column must be on screen").not.toBeNull();
+    expect(attempt, "the board should stop scrolling under the pointer").toBeLessThan(40);
+    await page.mouse.move(target!.x, target!.y, { steps: attempt === 0 ? 20 : 5 });
+    const settled = await visibleCentreNextFrames(column);
+    if (settled && Math.abs(settled.x - target!.x) < 0.5 && Math.abs(settled.y - target!.y) < 0.5) break;
+    target = settled;
+  }
   await page.mouse.up();
 }
 
@@ -140,14 +174,23 @@ test("a qualified lead is converted and worked through the pipeline to Closed wo
   await expect(column("QUALIFICATION").getByTestId("pipeline-card").filter({ hasText: dealName })).toBeVisible();
   await expect(column("QUALIFICATION")).toContainText("$60,000");
 
-  // Skipping a stage is refused with an explanation, and the card stays where it was.
+  const transitionRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/stage-transitions")) transitionRequests.push(request.url());
+  });
+
+  // Skipping a stage is refused with an explanation, nothing is sent to the server, and the card stays where it was.
   await drag(page, card, column("NEGOTIATION"));
   await expect(page.getByText(`${dealName} can't move from Qualification to Negotiation`)).toBeVisible();
+  await expect(page.getByText("Deals move one stage at a time. From Qualification it can go to: Prospecting, Proposal, Closed lost.")).toBeVisible();
   await expect(column("QUALIFICATION").getByTestId("pipeline-card").filter({ hasText: dealName })).toBeVisible();
+  await expect(column("NEGOTIATION").getByTestId("pipeline-card")).toHaveCount(0);
+  expect(transitionRequests).toEqual([]);
 
-  // A valid drop moves it, and the column totals are recomputed by the server.
+  // A valid drop moves it through the real stage-transition API, and the column totals are recomputed by the server.
   await drag(page, card, column("PROPOSAL"));
   await expect(page.getByText(`${dealName} moved to Proposal`)).toBeVisible();
+  expect(transitionRequests).toHaveLength(1);
   await expect(column("PROPOSAL").getByTestId("pipeline-card").filter({ hasText: dealName })).toBeVisible();
   await expect(column("PROPOSAL")).toContainText("$30,000 weighted");
   await expect(column("QUALIFICATION").getByLabel("0 opportunities")).toBeVisible();
