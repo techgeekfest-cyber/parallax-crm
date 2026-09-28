@@ -34,8 +34,9 @@ test("data survives signing out and back in", async ({ page }) => {
   const company = `Persistence Co ${Date.now()}`;
   await page.goto("/login");
   await signIn(page, repA.email, PASSWORD);
-  await expect(page).toHaveURL(/\/leads$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
 
+  await page.goto("/leads");
   await page.getByRole("button", { name: "New lead" }).first().click();
   const dialog = page.getByRole("dialog", { name: "New lead" });
   await dialog.getByLabel("First name").fill("Persist");

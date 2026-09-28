@@ -27,7 +27,7 @@ test.describe("as an admin", () => {
     await newUser.getByLabel("Email").fill(email);
     await newUser.getByLabel("Password").fill(password);
     await newUser.getByRole("button", { name: "Sign in" }).click();
-    await expect(newUser.getByRole("heading", { name: "Leads", exact: true })).toBeVisible();
+    await expect(newUser.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
     await expect(newUser.getByRole("link", { name: "Users" })).toHaveCount(0);
     await context.close();
   });

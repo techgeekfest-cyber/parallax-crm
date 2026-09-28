@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// The dashboard arrives in phase A4; until then the app opens on Leads.
+// Signed-in users land on the dashboard; the proxy sends everyone else to sign-in first.
 export default function Home() {
-  redirect("/leads");
+  redirect("/dashboard");
 }

@@ -5,6 +5,7 @@ import {
   ContactRoundIcon,
   HandshakeIcon,
   KanbanIcon,
+  LayoutDashboardIcon,
   ShieldCheckIcon,
   TrophyIcon,
   UsersRoundIcon,
@@ -27,6 +28,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "CRM",
     items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
       { href: "/leads", label: "Leads", icon: UsersRoundIcon },
       { href: "/accounts", label: "Accounts", icon: Building2Icon },
       { href: "/contacts", label: "Contacts", icon: ContactRoundIcon },
@@ -74,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-svh flex-col md:flex-row">
       <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/leads" aria-label="ParallaxCRM home">
+          <Link href="/dashboard" aria-label="ParallaxCRM home">
             <Logo />
           </Link>
           <ThemeToggle />
@@ -96,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <header className="border-b bg-sidebar md:hidden">
         <div className="flex h-14 items-center justify-between gap-3 px-4">
-          <Link href="/leads" aria-label="ParallaxCRM home">
+          <Link href="/dashboard" aria-label="ParallaxCRM home">
             <Logo />
           </Link>
           <div className="flex items-center gap-1">

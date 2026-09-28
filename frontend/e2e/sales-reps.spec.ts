@@ -54,7 +54,7 @@ test("an admin adds a sales rep who can then sign in", async ({ browser }) => {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("a long temporary pass");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/leads$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/sales-reps");
   await expect(page.getByRole("row").nth(1)).toContainText("West Africa");
   await context.close();

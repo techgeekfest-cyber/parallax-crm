@@ -9,8 +9,8 @@ export default function NotFound() {
         <p className="font-mono text-sm text-muted-foreground">404</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">This page doesn&apos;t exist</h1>
         <p className="mt-2 text-sm text-muted-foreground">The link may be broken, or the page may have moved.</p>
-        <Button className="mt-6" render={<Link href="/leads" />} nativeButton={false}>
-          Go to Leads
+        <Button className="mt-6" render={<Link href="/dashboard" />} nativeButton={false}>
+          Go to the dashboard
         </Button>
       </div>
     </main>

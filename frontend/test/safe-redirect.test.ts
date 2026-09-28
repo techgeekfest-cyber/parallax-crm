@@ -15,7 +15,7 @@ describe("safeNextPath", () => {
     ["javascript URL", "javascript:alert(1)"],
     ["the login page itself", "/login?next=/leads"],
   ])("falls back for %s", (_label, next) => {
-    expect(safeNextPath(next)).toBe("/leads");
+    expect(safeNextPath(next)).toBe("/dashboard");
   });
 
   it("builds an encoded login link", () => {

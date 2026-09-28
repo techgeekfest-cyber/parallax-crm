@@ -82,3 +82,47 @@ test("a converted lead and a moved deal are served after a backend restart", asy
   await expect(page.locator('section[data-stage="QUALIFICATION"]').getByTestId("pipeline-card")).toContainText(`Restart deal ${tag}`);
   await context.close();
 });
+
+const DASHBOARD_PROBE = path.join(AUTH_DIR, "restart-dashboard-probe.json");
+
+test("dashboard figures are recomputed from the database after a backend restart", async ({ browser, playwright, baseURL }) => {
+  test.skip(!phase, "set E2E_RESTART_PHASE=before|after");
+  // The bootstrap admin is the one user that is the same in every run.
+  const admin = await playwright.request.newContext({ baseURL, storageState: storageState("admin") });
+
+  if (phase === "before") {
+    const tag = unique();
+    const rep = await (await write(admin, "post", "/api/v1/sales-reps", {
+      email: `restart.dash.${tag}@e2e.parallax.test`, firstName: "Restart", lastName: `Figures ${tag}`,
+      role: "SALES_REP", password: "restart dashboard passphrase", quota: 80000,
+    })).json();
+    const account = await (await write(admin, "post", "/api/v1/accounts", { type: "SMB", name: `Restart Figures ${tag}`, ownerId: rep.id })).json();
+    for (const [name, amount, stage] of [["Won", 20000, "CLOSED_WON"], ["Open", 30000, "PROPOSAL"]] as const) {
+      const created = await write(admin, "post", "/api/v1/opportunities", {
+        accountId: account.id, name: `${name} ${tag}`, amount, stage, closeDate: "2030-06-30", ownerId: rep.id,
+      });
+      expect(created.status()).toBe(201);
+    }
+    const figures = await (await admin.get(`/api/v1/dashboard?ownerId=${rep.id}`)).json();
+    writeFileSync(DASHBOARD_PROBE, JSON.stringify({ repId: rep.id, figures }));
+    await admin.dispose();
+    return;
+  }
+
+  const { repId, figures } = JSON.parse(readFileSync(DASHBOARD_PROBE, "utf8"));
+  const now = await (await admin.get(`/api/v1/dashboard?ownerId=${repId}`)).json();
+  // Everything the new process computes matches what the old one did (nothing was cached in memory).
+  expect(now.pipeline).toEqual(figures.pipeline);
+  expect(now.outcomes).toEqual(figures.outcomes);
+  expect(now.quota).toEqual(figures.quota);
+  expect(now.outcomes.wonAmount).toBe(20000);
+  expect(now.quota.attainmentPercent).toBe(25);
+
+  const context = await browser.newContext({ storageState: storageState("admin") });
+  const page = await context.newPage();
+  await page.goto(`/dashboard?owner=${repId}`);
+  await expect(page.getByRole("group", { name: "Closed-won revenue", exact: true })).toContainText("$20K");
+  await expect(page.getByRole("group", { name: "Quota attainment", exact: true })).toContainText("25%");
+  await expect(page.getByRole("group", { name: "Open pipeline", exact: true })).toContainText("1 open deal · $30,000");
+  await Promise.all([context.close(), admin.dispose()]);
+});

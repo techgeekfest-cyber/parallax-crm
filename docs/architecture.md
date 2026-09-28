@@ -50,7 +50,8 @@ top-level package is its public API, and sub-packages are internal. Boundaries a
 | `contacts` | People at accounts; one primary contact per account | A2 |
 | `opportunities` | Deals on accounts, stage-transition workflow and history, pipeline totals and Kanban board | A2–A3 |
 | `activities` | Timeline of logged calls, emails, meetings and notes, plus workflow events; per-record access through `TimelineAccess` | A3 |
-| `search`, `analytics` | Read-only cross-entity queries | B2, A4 |
+| `analytics` | Live dashboard figures: read-only SQL aggregates over leads, accounts, contacts, opportunities and sales profiles, scoped by owner | A4 |
+| `search` | Read-only cross-entity search | B2 |
 | `intelligence` | Scoring, risk, recommendations — listens to events, core never depends on it | C |
 
 Inside a module:
@@ -135,6 +136,57 @@ last saw; a mismatch returns `409 CONFLICT` with the current server state so the
 Audit rows and system activity rows are written **synchronously inside the transaction** that performs the change,
 so they commit or roll back with it. Asynchronous after-commit listeners are reserved for non-critical consumers
 (real-time push, intelligence) and will use Spring Modulith's event publication registry when introduced.
+
+## Dashboard and analytics (A4)
+
+`GET /api/v1/dashboard?range=&ownerId=` returns everything the dashboard shows in one typed response
+(`DashboardResponse`), so the page makes one request and every widget agrees. The `analytics` module computes it with a
+fixed set of PostgreSQL aggregate queries (`AnalyticsQueries`, nine statements) whatever the data volume: counts,
+sums, averages, `FILTER` clauses and `generate_series` for time buckets. No records are loaded into Java to be
+added up, and there are no per-rep or per-record queries.
+
+**Why live queries, not snapshots.** The figures are cheap aggregates over indexed tables at CRM scale, and a live
+query is always consistent with the records a user just changed — a stage move shows on the dashboard on the next
+visit. Snapshot tables would add a scheduler, a staleness window and a second source of truth for no measured
+benefit. If volumes ever make a query slow, the fix is an index or a materialised view behind the same response, not
+an API change. There is no cache: each visit to the dashboard asks the server again.
+
+**Why the module reads other modules' tables.** Every figure spans several modules (quota attainment joins sales
+profiles to opportunities), and each is a single aggregate. Going through each module's service would mean loading
+entities or adding bespoke aggregate methods to every module. `analytics` is read-only, never writes, and depends only
+on `identity` (scope) and on the opportunity stage vocabulary; nothing depends on it.
+
+### What each figure means
+
+| Figure | Definition | Period? |
+|---|---|---|
+| Leads / accounts / contacts / opportunities | Active (not archived) records in scope; "open" leads are New, Contacted or Qualified; "new" = created in the period | totals: now · new: period |
+| Open pipeline | Σ amount of open deals (Prospecting → Negotiation) | now |
+| Weighted pipeline | Σ amount × probability ÷ 100 of open deals, rounded to cents in SQL | now |
+| Closed-won revenue | Σ amount of deals closed won with `closed_at` in the period | period |
+| Win rate | won ÷ (won + lost) for deals closed in the period, one decimal; **null** (shown "—", "No closed deals yet") when none closed | period |
+| Average deal size | Mean amount of deals **won** in the period — open and lost deals are excluded; null when none were won | period |
+| Quota attainment | Closed-won revenue this calendar year ÷ Σ annual quota of the active sales people in scope; null when no quota is set. For the organisation, all won revenue counts (including deals owned by admins) against the sales team's quota | calendar year (UTC) |
+| Stage breakdown | Open stages: every open deal now, share = % of open value. Closed stages: deals closed in the period, share = % of those closed deals by count | open: now · closed: period |
+| Won-revenue trend | Closed-won revenue per ISO week (last 30/90 days) or month (this year, last 12 months), empty buckets included | period |
+| Expected closes | Open deals by expected close month: this month and the next five, plus overdue (close date passed) and later | now |
+| Team performance | Per active sales rep/manager: YTD sales, quota, attainment, won/lost and win rate in the period, open and weighted pipeline. Best YTD first; up to 50 rows, with the total | mixed, as labelled |
+
+Periods are whole UTC days ending today: last 30 days, last 90 days, this year, last 12 months (the default). Archived
+records never count. A figure that can't be computed honestly is `null` in the API and "—" with a reason in the UI —
+never `0%`, `NaN` or `Infinity`.
+
+### Scope and permissions
+
+The owner scope is resolved once in `DashboardService` and passed into **every** query's `WHERE` clause
+(`:ownerId` null = organisation); nothing is fetched wider and filtered afterwards.
+
+| Role | Figures |
+|---|---|
+| `SALES_REP` | Always their own records (leads, accounts and contacts they own, their deals, their quota and their team row). Passing another `ownerId` is `403 PERMISSION_DENIED`, not silently answered with their own figures |
+| `SALES_MANAGER`, `ADMIN` | The whole organisation, or one chosen owner (`ownerId`) |
+
+This is the same one-rule-per-record-type model as the rest of the API ([ADR 0007](adr/0007-record-visibility.md)).
 
 ## Database
 
@@ -247,6 +299,6 @@ Configuration is provider-agnostic ([ADR 0003](adr/0003-postgresql-neon-provider
 | **A1** ✅ | Authentication, roles, access policy |
 | **A2** ✅ | Sales reps, account hierarchy, contacts, opportunities: CRUD, archive/restore, search, filters, permissions |
 | **A3** ✅ | Lead status and conversion, opportunity stage workflow + history, Kanban pipeline, activity timeline, conflict handling |
-| A4 | Live dashboard and analytics queries |
+| **A4** ✅ | Live dashboard and analytics: KPIs, stage breakdown, won-revenue trend, close-date forecast, rep performance |
 | B | Audit viewer, command palette + search, CSV import/export, polish |
 | Later | SSE real-time updates; intelligence module |
